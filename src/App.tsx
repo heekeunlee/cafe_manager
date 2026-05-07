@@ -2,6 +2,7 @@ import {
   AlertTriangle,
   CalendarDays,
   CheckCircle2,
+  Clock,
   ClipboardList,
   Coffee,
   Pencil,
@@ -23,6 +24,7 @@ import {
   calculateShiftHours,
   formatCurrency,
   formatHours,
+  parseTimeToMinutes,
   summarizeDailyHeadcount,
   weekdays,
 } from "./utils/payroll";
@@ -84,12 +86,13 @@ function App() {
     setShifts(shifts.filter((shift) => shift.employeeId !== id));
   };
 
-  const updateShift = (id: string, patch: Partial<Shift>) => {
-    setShifts(shifts.map((shift) => (shift.id === id ? { ...shift, ...patch } : shift)));
+  const saveShift = (shift: Shift) => {
+    const exists = shifts.some((target) => target.id === shift.id);
+    setShifts(exists ? shifts.map((target) => (target.id === shift.id ? shift : target)) : [...shifts, shift]);
   };
 
-  const addShift = (employeeId: string, weekday: Weekday) => {
-    setShifts([...shifts, emptyShift(employeeId, weekday)]);
+  const deleteShift = (id: string) => {
+    setShifts(shifts.filter((shift) => shift.id !== id));
   };
 
   return (
@@ -179,8 +182,8 @@ function App() {
               <ScheduleView
                 employees={activeEmployees}
                 shifts={shifts}
-                onAddShift={addShift}
-                onUpdateShift={updateShift}
+                onSaveShift={saveShift}
+                onDeleteShift={deleteShift}
               />
             )}
             {activeView === "payroll" && <PayrollView payroll={payroll} employees={employees} />}
@@ -502,88 +505,272 @@ function EmployeeModal({
 function ScheduleView({
   employees,
   shifts,
-  onAddShift,
-  onUpdateShift,
+  onSaveShift,
+  onDeleteShift,
 }: {
   employees: Employee[];
   shifts: Shift[];
-  onAddShift: (employeeId: string, weekday: Weekday) => void;
-  onUpdateShift: (id: string, patch: Partial<Shift>) => void;
+  onSaveShift: (shift: Shift) => void;
+  onDeleteShift: (id: string) => void;
 }) {
+  const [editingShift, setEditingShift] = useState<Shift | null>(null);
+
+  const openAddModal = (weekday: Weekday = "mon") => {
+    const firstEmployee = employees[0];
+    if (!firstEmployee) return;
+    setEditingShift(emptyShift(firstEmployee.id, weekday));
+  };
+
+  const openEditModal = (shift: Shift) => {
+    setEditingShift(shift);
+  };
+
+  const closeModal = () => {
+    setEditingShift(null);
+  };
+
+  const handleSave = (shift: Shift) => {
+    onSaveShift(shift);
+    closeModal();
+  };
+
+  const hasOverlap = (shift: Shift) => findOverlappingShifts(shift, shifts).length > 0;
+
   return (
-    <Panel title="근무표 관리">
-      <div className="overflow-x-auto rounded-md border border-line bg-white">
-        <table className="min-w-[980px] w-full text-left text-sm">
-          <thead className="bg-stone-50 text-stone-600">
-            <tr>
-              <th className="w-36 px-4 py-3">직원</th>
-              {weekdays.map((day) => (
-                <th key={day.key} className="px-3 py-3">{day.shortLabel}</th>
-              ))}
-              <th className="px-4 py-3">주간 합계</th>
-            </tr>
-          </thead>
-          <tbody>
-            {employees.map((employee) => {
-              const employeeShifts = shifts.filter((shift) => shift.employeeId === employee.id);
-              const weeklyHours = employeeShifts.reduce((total, shift) => total + calculateShiftHours(shift), 0);
-              return (
-                <tr key={employee.id} className="border-t border-line align-top">
-                  <td className="px-4 py-3 font-medium">{employee.name}</td>
-                  {weekdays.map((day) => {
-                    const dayShift = employeeShifts.find((shift) => shift.weekday === day.key);
+    <Panel title="근무표 관리" actionLabel="근무 추가" onAction={() => openAddModal()}>
+      <div className="overflow-x-auto">
+        <div className="grid min-w-[1080px] grid-cols-7 gap-3">
+          {weekdays.map((day) => {
+            const dayShifts = shifts
+              .filter((shift) => shift.weekday === day.key)
+              .sort((a, b) => a.startTime.localeCompare(b.startTime));
+            const dayHours = dayShifts.reduce((total, shift) => total + calculateShiftHours(shift), 0);
+
+            return (
+              <section key={day.key} className="min-h-[520px] rounded-md border border-line bg-white">
+                <div className="border-b border-line bg-stone-50 px-3 py-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <h4 className="font-semibold">{day.label}</h4>
+                      <p className="mt-1 text-xs text-stone-500">
+                        {dayShifts.length}건 · {formatHours(dayHours)}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => openAddModal(day.key)}
+                      className="grid h-8 w-8 place-items-center rounded-md border border-line bg-white text-moss hover:border-moss"
+                      aria-label={`${day.label} 근무 추가`}
+                    >
+                      <Plus size={15} />
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-2 p-2">
+                  {dayShifts.length === 0 && (
+                    <div className="rounded-md border border-dashed border-line px-3 py-8 text-center text-xs text-stone-500">
+                      근무 없음
+                    </div>
+                  )}
+                  {dayShifts.map((shift) => {
+                    const employee = employees.find((target) => target.id === shift.employeeId);
+                    const overlapped = hasOverlap(shift);
+
                     return (
-                      <td key={day.key} className="px-2 py-3">
-                        {dayShift ? (
-                          <div className="space-y-2">
-                            <div className="grid grid-cols-2 gap-1">
-                              <input
-                                type="time"
-                                value={dayShift.startTime}
-                                onChange={(event) => onUpdateShift(dayShift.id, { startTime: event.target.value })}
-                              />
-                              <input
-                                type="time"
-                                value={dayShift.endTime}
-                                onChange={(event) => onUpdateShift(dayShift.id, { endTime: event.target.value })}
-                              />
-                            </div>
-                            <input
-                              aria-label="휴게시간"
-                              type="number"
-                              value={dayShift.breakMinutes}
-                              onChange={(event) => onUpdateShift(dayShift.id, { breakMinutes: Number(event.target.value) })}
-                              className="w-full"
-                            />
-                            <label className="flex items-center gap-1 text-xs text-stone-500">
-                              <input
-                                type="checkbox"
-                                checked={dayShift.repeatsWeekly}
-                                onChange={(event) => onUpdateShift(dayShift.id, { repeatsWeekly: event.target.checked })}
-                              />
-                              반복
-                            </label>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => onAddShift(employee.id, day.key)}
-                            className="rounded border border-dashed border-line px-2 py-1 text-xs text-stone-500 hover:border-moss hover:text-moss"
-                          >
-                            추가
-                          </button>
-                        )}
-                      </td>
+                      <button
+                        key={shift.id}
+                        onClick={() => openEditModal(shift)}
+                        className={`w-full rounded-md border p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow ${
+                          overlapped ? "border-amber/70 bg-amber/10" : "border-line bg-paper"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <strong className="text-sm">{employee?.name ?? "직원 없음"}</strong>
+                          {overlapped && <AlertTriangle size={16} className="shrink-0 text-amber" />}
+                        </div>
+                        <div className="mt-2 space-y-1 text-xs text-stone-600">
+                          <p className="flex items-center gap-1">
+                            <Clock size={13} />
+                            {shift.startTime} - {shift.endTime}
+                          </p>
+                          <p>휴게 {shift.breakMinutes}분</p>
+                          <p className="font-semibold text-ink">실근무 {formatHours(calculateShiftHours(shift))}</p>
+                        </div>
+                        {overlapped && <p className="mt-2 text-xs font-medium text-amber">시간 겹침</p>}
+                      </button>
                     );
                   })}
-                  <td className="px-4 py-3 font-semibold">{formatHours(weeklyHours)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                </div>
+              </section>
+            );
+          })}
+        </div>
       </div>
+
+      {editingShift && (
+        <ShiftModal
+          employees={employees}
+          shift={editingShift}
+          shifts={shifts}
+          onClose={closeModal}
+          onDelete={onDeleteShift}
+          onSave={handleSave}
+        />
+      )}
     </Panel>
   );
+}
+
+function ShiftModal({
+  employees,
+  shift,
+  shifts,
+  onClose,
+  onDelete,
+  onSave,
+}: {
+  employees: Employee[];
+  shift: Shift;
+  shifts: Shift[];
+  onClose: () => void;
+  onDelete: (id: string) => void;
+  onSave: (shift: Shift) => void;
+}) {
+  const [draft, setDraft] = useState<Shift>(shift);
+  const overlappedShifts = findOverlappingShifts(draft, shifts);
+  const isExisting = shifts.some((target) => target.id === shift.id);
+
+  const updateDraft = (patch: Partial<Shift>) => {
+    setDraft((current) => ({ ...current, ...patch }));
+  };
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    onSave({
+      ...draft,
+      breakMinutes: Math.max(0, Number(draft.breakMinutes) || 0),
+    });
+  };
+
+  const handleDelete = () => {
+    if (!window.confirm("이 근무를 삭제할까요?")) return;
+    onDelete(draft.id);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-30 grid place-items-center bg-black/35 p-4">
+      <form onSubmit={handleSubmit} className="w-full max-w-xl rounded-md bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b border-line px-5 py-4">
+          <h4 className="text-lg font-bold">{isExisting ? "근무 수정" : "근무 추가"}</h4>
+          <button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center rounded-md hover:bg-stone-100">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="grid gap-4 p-5 sm:grid-cols-2">
+          <Field label="직원 선택">
+            <select value={draft.employeeId} onChange={(event) => updateDraft({ employeeId: event.target.value })}>
+              {employees.map((employee) => (
+                <option key={employee.id} value={employee.id}>
+                  {employee.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="요일 선택">
+            <select value={draft.weekday} onChange={(event) => updateDraft({ weekday: event.target.value as Weekday })}>
+              {weekdays.map((day) => (
+                <option key={day.key} value={day.key}>
+                  {day.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="시작시간">
+            <input type="time" value={draft.startTime} onChange={(event) => updateDraft({ startTime: event.target.value })} />
+          </Field>
+          <Field label="종료시간">
+            <input type="time" value={draft.endTime} onChange={(event) => updateDraft({ endTime: event.target.value })} />
+          </Field>
+          <Field label="휴게시간">
+            <input
+              type="number"
+              min="0"
+              step="10"
+              value={draft.breakMinutes}
+              onChange={(event) => updateDraft({ breakMinutes: Number(event.target.value) })}
+            />
+            <span className="text-xs text-stone-500">분 단위로 입력</span>
+          </Field>
+          <div className="rounded-md border border-line bg-paper p-3">
+            <p className="text-xs text-stone-500">실근무시간</p>
+            <p className="mt-1 text-xl font-bold">{formatHours(calculateShiftHours(draft))}</p>
+          </div>
+          <label className="flex items-center gap-2 text-sm sm:col-span-2">
+            <input
+              type="checkbox"
+              checked={draft.repeatsWeekly}
+              onChange={(event) => updateDraft({ repeatsWeekly: event.target.checked })}
+            />
+            반복 근무 패턴
+          </label>
+          {overlappedShifts.length > 0 && (
+            <div className="rounded-md border border-amber/40 bg-amber/10 p-3 text-sm text-stone-800 sm:col-span-2">
+              <div className="flex items-start gap-2">
+                <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber" />
+                <div>
+                  <p className="font-semibold">같은 직원의 근무 시간이 겹칩니다.</p>
+                  <p className="mt-1 text-xs text-stone-600">
+                    중복 입력은 저장할 수 있지만 급여 계산 전 확인이 필요합니다.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="flex flex-wrap justify-between gap-2 border-t border-line px-5 py-4">
+          <div>
+            {isExisting && (
+              <button type="button" onClick={handleDelete} className="rounded-md border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">
+                삭제
+              </button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <button type="button" onClick={onClose} className="rounded-md border border-line px-4 py-2 text-sm font-semibold">
+              취소
+            </button>
+            <button type="submit" className="inline-flex items-center gap-2 rounded-md bg-moss px-4 py-2 text-sm font-semibold text-white">
+              <Plus size={16} />
+              저장
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function findOverlappingShifts(target: Shift, shifts: Shift[]): Shift[] {
+  return shifts.filter(
+    (shift) =>
+      shift.id !== target.id &&
+      shift.employeeId === target.employeeId &&
+      shift.weekday === target.weekday &&
+      shiftRangesOverlap(target, shift),
+  );
+}
+
+function shiftRangesOverlap(a: Shift, b: Shift): boolean {
+  const [aStart, aEnd] = normalizedShiftRange(a);
+  const [bStart, bEnd] = normalizedShiftRange(b);
+  return aStart < bEnd && bStart < aEnd;
+}
+
+function normalizedShiftRange(shift: Shift): [number, number] {
+  const start = parseTimeToMinutes(shift.startTime);
+  let end = parseTimeToMinutes(shift.endTime);
+  if (end <= start) end += 24 * 60;
+  return [start, end];
 }
 
 function PayrollView({ payroll, employees }: { payroll: ReturnType<typeof calculatePayroll>; employees: Employee[] }) {
