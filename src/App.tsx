@@ -660,17 +660,24 @@ function ScheduleView({
                   {dayShifts.map((shift) => {
                     const employee = employees.find((target) => target.id === shift.employeeId);
                     const overlapped = hasOverlap(shift);
+                    const concurrentWorkerCount = countConcurrentWorkers(shift, dayShifts);
+                    const color = getEmployeePastelColor(shift.employeeId);
 
                     return (
                       <button
                         key={shift.id}
                         onClick={() => openEditModal(shift)}
-                        className={`w-full rounded-md border p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow ${
-                          overlapped ? "border-amber/70 bg-amber/10" : "border-line bg-paper"
-                        }`}
+                        className="w-full rounded-md border p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow"
+                        style={{
+                          backgroundColor: overlapped ? "#fff4dd" : color.background,
+                          borderColor: overlapped ? "#d38a28" : color.border,
+                        }}
                       >
                         <div className="flex items-start justify-between gap-2">
-                          <strong className="text-sm">{employee?.name ?? "직원 없음"}</strong>
+                          <div className="flex min-w-0 items-center gap-2">
+                            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color.accent }} />
+                            <strong className="truncate text-sm">{employee?.name ?? "직원 없음"}</strong>
+                          </div>
                           {overlapped && <AlertTriangle size={16} className="shrink-0 text-amber" />}
                         </div>
                         <div className="mt-2 space-y-1 text-xs text-stone-600">
@@ -683,6 +690,11 @@ function ScheduleView({
                         </div>
                         {shift.note && (
                           <p className="mt-2 rounded bg-white/70 px-2 py-1 text-xs text-stone-700">{shift.note}</p>
+                        )}
+                        {concurrentWorkerCount > 1 && (
+                          <p className="mt-2 inline-flex rounded bg-white/75 px-2 py-1 text-xs font-medium text-moss">
+                            동시간 {concurrentWorkerCount}명
+                          </p>
                         )}
                         {overlapped && <p className="mt-2 text-xs font-medium text-amber">시간 겹침</p>}
                       </button>
@@ -868,6 +880,31 @@ function normalizedShiftRange(shift: Shift): [number, number] {
   let end = parseTimeToMinutes(shift.endTime);
   if (end <= start) end += 24 * 60;
   return [start, end];
+}
+
+const employeePastelColors = [
+  { background: "#e8f3ea", border: "#9bc6a7", accent: "#4f8d61" },
+  { background: "#fff1d8", border: "#e3ba72", accent: "#b77a1f" },
+  { background: "#e8efff", border: "#a9bce8", accent: "#6179bd" },
+  { background: "#fde8ee", border: "#e7a7b7", accent: "#ba6479" },
+  { background: "#e7f5f4", border: "#94c9c5", accent: "#4e918b" },
+  { background: "#f1ecff", border: "#bcaee5", accent: "#7d68bf" },
+  { background: "#f4f0df", border: "#cfc28a", accent: "#8c7b35" },
+  { background: "#e9f6df", border: "#abd084", accent: "#66973f" },
+];
+
+function getEmployeePastelColor(employeeId: string) {
+  const hash = Array.from(employeeId).reduce((total, char) => total + char.charCodeAt(0), 0);
+  return employeePastelColors[hash % employeePastelColors.length];
+}
+
+function countConcurrentWorkers(target: Shift, dayShifts: Shift[]): number {
+  const employeeIds = new Set(
+    dayShifts
+      .filter((shift) => shiftRangesOverlap(target, shift))
+      .map((shift) => shift.employeeId),
+  );
+  return employeeIds.size;
 }
 
 function PayrollView({ payroll, employees }: { payroll: ReturnType<typeof calculatePayroll>; employees: Employee[] }) {
