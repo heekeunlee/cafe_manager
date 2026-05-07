@@ -11,6 +11,9 @@ export const weekdays: Array<{ key: Weekday; label: string; shortLabel: string }
 ];
 
 const MONTHLY_WEEK_MULTIPLIER = 4.345;
+const WEEKLY_HOLIDAY_MIN_HOURS = 15;
+const STANDARD_WEEKLY_HOURS = 40;
+const MAX_WEEKLY_HOLIDAY_HOURS = 8;
 
 export function parseTimeToMinutes(value: string): number {
   const [hour, minute] = value.split(":").map(Number);
@@ -32,22 +35,27 @@ export function calculateWeeklyHours(employeeId: string, shifts: Shift[]): numbe
     .reduce((total, shift) => total + calculateShiftHours(shift), 0);
 }
 
+export function calculateWeeklyHolidayHours(employee: Employee, weeklyHours: number): number {
+  if (!employee.weeklyHolidayPayEnabled || weeklyHours < WEEKLY_HOLIDAY_MIN_HOURS) return 0;
+  return Math.min((weeklyHours / STANDARD_WEEKLY_HOURS) * MAX_WEEKLY_HOLIDAY_HOURS, MAX_WEEKLY_HOLIDAY_HOURS);
+}
+
 export function calculateWeeklyHolidayPay(employee: Employee, weeklyHours: number): number {
-  if (!employee.weeklyHolidayPayEnabled || weeklyHours < 15) return 0;
-  const paidHours = Math.min((weeklyHours / 40) * 8, 8);
-  return paidHours * employee.hourlyWage;
+  return calculateWeeklyHolidayHours(employee, weeklyHours) * employee.hourlyWage;
 }
 
 export function calculateEmployeePayroll(employee: Employee, shifts: Shift[]): EmployeePayroll {
   const weeklyHours = calculateWeeklyHours(employee.id, shifts);
   const baseWeeklyPay = weeklyHours * employee.hourlyWage;
-  const weeklyHolidayPay = calculateWeeklyHolidayPay(employee, weeklyHours);
+  const weeklyHolidayHours = calculateWeeklyHolidayHours(employee, weeklyHours);
+  const weeklyHolidayPay = weeklyHolidayHours * employee.hourlyWage;
   const weeklyTotalPay = baseWeeklyPay + weeklyHolidayPay;
 
   return {
     employeeId: employee.id,
     weeklyHours,
     baseWeeklyPay,
+    weeklyHolidayHours,
     weeklyHolidayPay,
     weeklyTotalPay,
     estimatedMonthlyPay: weeklyTotalPay * MONTHLY_WEEK_MULTIPLIER,

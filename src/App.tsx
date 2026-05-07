@@ -798,6 +798,7 @@ function PayrollTable({
             <th className="px-4 py-3">직원</th>
             <th className="px-4 py-3">주 근무시간</th>
             {showDetails && <th className="px-4 py-3">기본급</th>}
+            {showDetails && <th className="px-4 py-3">주휴시간</th>}
             <th className="px-4 py-3">주휴수당</th>
             <th className="px-4 py-3">월 예상 급여</th>
             <th className="px-4 py-3">상태</th>
@@ -811,6 +812,7 @@ function PayrollTable({
                 <td className="px-4 py-3 font-medium">{employee?.name}</td>
                 <td className="px-4 py-3">{formatHours(item.weeklyHours)}</td>
                 {showDetails && <td className="px-4 py-3">{formatCurrency(item.baseWeeklyPay)}</td>}
+                {showDetails && <td className="px-4 py-3">{formatHours(item.weeklyHolidayHours)}</td>}
                 <td className="px-4 py-3">{formatCurrency(item.weeklyHolidayPay)}</td>
                 <td className="px-4 py-3 font-semibold">{formatCurrency(item.estimatedMonthlyPay)}</td>
                 <td className="px-4 py-3">

@@ -31,6 +31,7 @@ export interface EmployeePayroll {
   employeeId: string;
   weeklyHours: number;
   baseWeeklyPay: number;
+  weeklyHolidayHours: number;
   weeklyHolidayPay: number;
   weeklyTotalPay: number;
   estimatedMonthlyPay: number;
