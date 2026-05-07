@@ -1,7 +1,7 @@
 import type { Employee, Shift, StoreSettings } from "../types";
 
 export const sampleSettings: StoreSettings = {
-  storeName: "브릭하우스 커피 성수점",
+  storeName: "우지커피 광교상현역점",
   baseWeekLabel: "2026년 5월 2주차",
 };
 

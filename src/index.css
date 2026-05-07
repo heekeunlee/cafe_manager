@@ -17,7 +17,8 @@ body {
   margin: 0;
 }
 
-input {
+input,
+select {
   min-width: 0;
   border: 1px solid #d9e2dc;
   border-radius: 6px;
@@ -27,7 +28,8 @@ input {
   outline: none;
 }
 
-input:focus {
+input:focus,
+select:focus {
   border-color: #355b48;
   box-shadow: 0 0 0 3px rgba(53, 91, 72, 0.13);
 }

@@ -4,9 +4,13 @@ import {
   CheckCircle2,
   ClipboardList,
   Coffee,
+  Pencil,
+  Plus,
   LayoutDashboard,
   Menu,
   Settings,
+  Trash2,
+  X,
   Users,
   WalletCards,
 } from "lucide-react";
@@ -32,6 +36,8 @@ const navItems: Array<{ id: ViewId; label: string; icon: typeof LayoutDashboard 
   { id: "payroll", label: "급여계산", icon: WalletCards },
   { id: "settings", label: "설정", icon: Settings },
 ];
+
+const STORE_NAME = "우지커피 광교상현역점";
 
 const emptyShift = (employeeId: string, weekday: Weekday): Shift => ({
   id: `shift-${Date.now()}`,
@@ -65,21 +71,21 @@ function App() {
     setEmployees(employees.map((employee) => (employee.id === id ? { ...employee, ...patch } : employee)));
   };
 
-  const updateShift = (id: string, patch: Partial<Shift>) => {
-    setShifts(shifts.map((shift) => (shift.id === id ? { ...shift, ...patch } : shift)));
+  const saveEmployee = (employee: Employee) => {
+    const exists = employees.some((target) => target.id === employee.id);
+    setEmployees(exists ? employees.map((target) => (target.id === employee.id ? employee : target)) : [...employees, employee]);
   };
 
-  const addEmployee = () => {
-    const next: Employee = {
-      id: `emp-${Date.now()}`,
-      name: "새 직원",
-      roleNote: "메모 입력",
-      hourlyWage: 10030,
-      startDate: new Date().toISOString().slice(0, 10),
-      weeklyHolidayPayEnabled: true,
-      status: "active",
-    };
-    setEmployees([...employees, next]);
+  const deleteEmployee = (id: string) => {
+    const target = employees.find((employee) => employee.id === id);
+    if (!target) return;
+    if (!window.confirm(`${target.name} 직원을 삭제할까요? 관련 근무표도 함께 삭제됩니다.`)) return;
+    setEmployees(employees.filter((employee) => employee.id !== id));
+    setShifts(shifts.filter((shift) => shift.employeeId !== id));
+  };
+
+  const updateShift = (id: string, patch: Partial<Shift>) => {
+    setShifts(shifts.map((shift) => (shift.id === id ? { ...shift, ...patch } : shift)));
   };
 
   const addShift = (employeeId: string, weekday: Weekday) => {
@@ -127,7 +133,7 @@ function App() {
                 </button>
                 <div>
                   <p className="text-sm text-stone-500">{settings.baseWeekLabel}</p>
-                  <h2 className="text-xl font-bold md:text-2xl">{settings.storeName}</h2>
+                  <h2 className="text-xl font-bold md:text-2xl">{STORE_NAME}</h2>
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -162,7 +168,12 @@ function App() {
               />
             )}
             {activeView === "employees" && (
-              <EmployeesView employees={employees} onAdd={addEmployee} onUpdate={updateEmployee} />
+              <EmployeesView
+                employees={employees}
+                onSave={saveEmployee}
+                onDelete={deleteEmployee}
+                onQuickUpdate={updateEmployee}
+              />
             )}
             {activeView === "schedule" && (
               <ScheduleView
@@ -274,67 +285,217 @@ function MetricCard({ title, value, icon: Icon }: { title: string; value: string
 
 function EmployeesView({
   employees,
-  onAdd,
-  onUpdate,
+  onSave,
+  onDelete,
+  onQuickUpdate,
 }: {
   employees: Employee[];
-  onAdd: () => void;
-  onUpdate: (id: string, patch: Partial<Employee>) => void;
+  onSave: (employee: Employee) => void;
+  onDelete: (id: string) => void;
+  onQuickUpdate: (id: string, patch: Partial<Employee>) => void;
 }) {
+  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const openAddModal = () => {
+    setEditingEmployee({
+      id: `emp-${Date.now()}`,
+      name: "",
+      roleNote: "",
+      hourlyWage: 10030,
+      startDate: new Date().toISOString().slice(0, 10),
+      weeklyHolidayPayEnabled: true,
+      status: "active",
+    });
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (employee: Employee) => {
+    setEditingEmployee(employee);
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setEditingEmployee(null);
+    setIsModalOpen(false);
+  };
+
+  const handleSave = (employee: Employee) => {
+    onSave(employee);
+    closeModal();
+  };
+
   return (
-    <Panel title="직원 관리" actionLabel="직원 추가" onAction={onAdd}>
-      <div className="grid gap-4 xl:grid-cols-2">
-        {employees.map((employee) => (
-          <div key={employee.id} className="rounded-md border border-line bg-white p-4">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="이름">
-                <input value={employee.name} onChange={(event) => onUpdate(employee.id, { name: event.target.value })} />
-              </Field>
-              <Field label="직책 또는 메모">
-                <input
-                  value={employee.roleNote}
-                  onChange={(event) => onUpdate(employee.id, { roleNote: event.target.value })}
-                />
-              </Field>
-              <Field label="시급">
-                <input
-                  type="number"
-                  value={employee.hourlyWage}
-                  onChange={(event) => onUpdate(employee.id, { hourlyWage: Number(event.target.value) })}
-                />
-              </Field>
-              <Field label="입사일">
-                <input
-                  type="date"
-                  value={employee.startDate}
-                  onChange={(event) => onUpdate(employee.id, { startDate: event.target.value })}
-                />
-              </Field>
-            </div>
-            <div className="mt-4 flex flex-wrap gap-4 text-sm">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={employee.weeklyHolidayPayEnabled}
-                  onChange={(event) => onUpdate(employee.id, { weeklyHolidayPayEnabled: event.target.checked })}
-                />
-                주휴수당 적용
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={employee.status === "active"}
-                  onChange={(event) =>
-                    onUpdate(employee.id, { status: event.target.checked ? "active" : "inactive" })
-                  }
-                />
-                재직 중
-              </label>
-            </div>
-          </div>
-        ))}
+    <Panel title="직원 관리" actionLabel="직원 추가" onAction={openAddModal}>
+      <div className="overflow-x-auto rounded-md border border-line bg-white">
+        <table className="min-w-[820px] w-full text-left text-sm">
+          <thead className="bg-stone-50 text-stone-600">
+            <tr>
+              <th className="px-4 py-3">이름</th>
+              <th className="px-4 py-3">시급</th>
+              <th className="px-4 py-3">주휴수당</th>
+              <th className="px-4 py-3">입사일</th>
+              <th className="px-4 py-3">상태</th>
+              <th className="px-4 py-3 text-right">관리</th>
+            </tr>
+          </thead>
+          <tbody>
+            {employees.map((employee) => (
+              <tr key={employee.id} className="border-t border-line">
+                <td className="px-4 py-3">
+                  <div className="font-medium">{employee.name}</div>
+                  {employee.roleNote && <div className="mt-1 text-xs text-stone-500">{employee.roleNote}</div>}
+                </td>
+                <td className="px-4 py-3 font-medium">{employee.hourlyWage.toLocaleString("ko-KR")}원</td>
+                <td className="px-4 py-3">
+                  <label className="inline-flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={employee.weeklyHolidayPayEnabled}
+                      onChange={(event) =>
+                        onQuickUpdate(employee.id, { weeklyHolidayPayEnabled: event.target.checked })
+                      }
+                    />
+                    <span>{employee.weeklyHolidayPayEnabled ? "적용" : "미적용"}</span>
+                  </label>
+                </td>
+                <td className="px-4 py-3">{employee.startDate}</td>
+                <td className="px-4 py-3">
+                  <span
+                    className={`rounded px-2 py-1 text-xs font-medium ${
+                      employee.status === "active" ? "bg-mint text-moss" : "bg-stone-100 text-stone-600"
+                    }`}
+                  >
+                    {employee.status === "active" ? "재직" : "퇴사"}
+                  </span>
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex justify-end gap-2">
+                    <button
+                      onClick={() => openEditModal(employee)}
+                      className="inline-flex items-center gap-1 rounded-md border border-line px-3 py-1.5 text-xs font-medium text-stone-700 hover:border-moss hover:text-moss"
+                    >
+                      <Pencil size={14} />
+                      수정
+                    </button>
+                    <button
+                      onClick={() => onDelete(employee.id)}
+                      className="inline-flex items-center gap-1 rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
+                    >
+                      <Trash2 size={14} />
+                      삭제
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
+
+      {isModalOpen && editingEmployee && (
+        <EmployeeModal employee={editingEmployee} onClose={closeModal} onSave={handleSave} />
+      )}
     </Panel>
+  );
+}
+
+function EmployeeModal({
+  employee,
+  onClose,
+  onSave,
+}: {
+  employee: Employee;
+  onClose: () => void;
+  onSave: (employee: Employee) => void;
+}) {
+  const [draft, setDraft] = useState<Employee>(employee);
+
+  const updateDraft = (patch: Partial<Employee>) => {
+    setDraft((current) => ({ ...current, ...patch }));
+  };
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    onSave({
+      ...draft,
+      name: draft.name.trim() || "이름 없음",
+      roleNote: draft.roleNote.trim(),
+      hourlyWage: Math.max(0, Number(draft.hourlyWage) || 0),
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-30 grid place-items-center bg-black/35 p-4">
+      <form onSubmit={handleSubmit} className="w-full max-w-lg rounded-md bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b border-line px-5 py-4">
+          <h4 className="text-lg font-bold">{employee.name ? "직원 수정" : "직원 추가"}</h4>
+          <button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center rounded-md hover:bg-stone-100">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="grid gap-4 p-5 sm:grid-cols-2">
+          <Field label="이름">
+            <input
+              value={draft.name}
+              onChange={(event) => updateDraft({ name: event.target.value })}
+              placeholder="직원 이름"
+              required
+            />
+          </Field>
+          <Field label="시급">
+            <input
+              type="number"
+              min="0"
+              step="10"
+              value={draft.hourlyWage}
+              onChange={(event) => updateDraft({ hourlyWage: Number(event.target.value) })}
+            />
+            <span className="text-xs text-stone-500">표시: {draft.hourlyWage.toLocaleString("ko-KR")}원</span>
+          </Field>
+          <Field label="입사일">
+            <input
+              type="date"
+              value={draft.startDate}
+              onChange={(event) => updateDraft({ startDate: event.target.value })}
+            />
+          </Field>
+          <Field label="상태">
+            <select
+              value={draft.status}
+              onChange={(event) => updateDraft({ status: event.target.value as Employee["status"] })}
+            >
+              <option value="active">재직</option>
+              <option value="inactive">퇴사</option>
+            </select>
+          </Field>
+          <label className="flex items-center gap-2 text-sm sm:col-span-2">
+            <input
+              type="checkbox"
+              checked={draft.weeklyHolidayPayEnabled}
+              onChange={(event) => updateDraft({ weeklyHolidayPayEnabled: event.target.checked })}
+            />
+            주휴수당 적용
+          </label>
+          <Field label="직책 또는 메모">
+            <input
+              value={draft.roleNote}
+              onChange={(event) => updateDraft({ roleNote: event.target.value })}
+              placeholder="예: 오픈 담당"
+            />
+          </Field>
+        </div>
+        <div className="flex justify-end gap-2 border-t border-line px-5 py-4">
+          <button type="button" onClick={onClose} className="rounded-md border border-line px-4 py-2 text-sm font-semibold">
+            취소
+          </button>
+          <button type="submit" className="inline-flex items-center gap-2 rounded-md bg-moss px-4 py-2 text-sm font-semibold text-white">
+            <Plus size={16} />
+            저장
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
 
