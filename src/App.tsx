@@ -49,6 +49,11 @@ const emptyShift = (employeeId: string, weekday: Weekday): Shift => ({
   note: "",
 });
 
+const SCHEDULE_START_MINUTES = 7 * 60;
+const SCHEDULE_END_MINUTES = 23 * 60;
+const SCHEDULE_RANGE_MINUTES = SCHEDULE_END_MINUTES - SCHEDULE_START_MINUTES;
+const scheduleHourMarks = Array.from({ length: 9 }, (_, index) => 7 + index * 2);
+
 const normalizeSettings = (settings: StoreSettings): StoreSettings => ({
   ...sampleSettings,
   ...settings,
@@ -630,11 +635,8 @@ function ScheduleView({
             const dayShifts = shifts
               .filter((shift) => shift.weekday === day.key)
               .sort((a, b) => a.startTime.localeCompare(b.startTime));
+            const positionedShifts = buildPositionedShifts(dayShifts);
             const dayHours = dayShifts.reduce((total, shift) => total + calculateShiftHours(shift), 0);
-            const maxConcurrentWorkers = Math.max(
-              0,
-              ...dayShifts.map((shift) => countConcurrentWorkers(shift, dayShifts)),
-            );
 
             return (
               <section key={day.key} className="min-h-[520px] rounded-md border border-line bg-white">
@@ -645,12 +647,6 @@ function ScheduleView({
                       <p className="mt-1 text-xs text-stone-500">
                         {dayShifts.length}건 · {formatHours(dayHours)}
                       </p>
-                      {maxConcurrentWorkers > 1 && (
-                        <p className="mt-2 inline-flex items-center gap-1 rounded bg-moss px-2 py-1 text-xs font-semibold text-white">
-                          <Users size={13} />
-                          최대 동시 {maxConcurrentWorkers}명
-                        </p>
-                      )}
                     </div>
                     <button
                       onClick={() => openAddModal(day.key)}
@@ -661,33 +657,40 @@ function ScheduleView({
                     </button>
                   </div>
                 </div>
-                <div className="space-y-2 p-2">
+                <div className="relative h-[680px] overflow-hidden p-2">
+                  {scheduleHourMarks.map((hour) => (
+                    <div
+                      key={hour}
+                      className="pointer-events-none absolute left-2 right-2 border-t border-stone-100"
+                      style={{ top: `${((hour * 60 - SCHEDULE_START_MINUTES) / SCHEDULE_RANGE_MINUTES) * 100}%` }}
+                    >
+                      <span className="absolute -top-2 bg-white pr-1 text-[10px] text-stone-400">{`${hour}:00`}</span>
+                    </div>
+                  ))}
                   {dayShifts.length === 0 && (
-                    <div className="rounded-md border border-dashed border-line px-3 py-8 text-center text-xs text-stone-500">
+                    <div className="absolute inset-x-2 top-16 rounded-md border border-dashed border-line px-3 py-8 text-center text-xs text-stone-500">
                       근무 없음
                     </div>
                   )}
-                  {dayShifts.map((shift) => {
+                  {positionedShifts.map(({ shift, lane, laneCount }) => {
                     const employee = employees.find((target) => target.id === shift.employeeId);
                     const overlapped = hasOverlap(shift);
-                    const concurrentWorkerCount = countConcurrentWorkers(shift, dayShifts);
-                    const concurrentNames = getConcurrentEmployeeNames(shift, dayShifts, employees);
                     const color = getEmployeePastelColor(shift.employeeId);
-                    const isConcurrent = concurrentWorkerCount > 1;
+                    const isSplit = laneCount > 1;
+                    const position = getShiftPositionStyle(shift, lane, laneCount);
 
                     return (
                       <button
                         key={shift.id}
                         onClick={() => openEditModal(shift)}
-                        className="w-full rounded-md border p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow"
+                        className="absolute rounded-md border p-2 text-left shadow-sm transition hover:z-10 hover:-translate-y-0.5 hover:shadow"
                         style={{
+                          ...position,
                           backgroundColor: overlapped ? "#fff4dd" : color.background,
                           borderColor: overlapped ? "#d38a28" : color.border,
-                          borderLeftColor: isConcurrent ? "#355b48" : overlapped ? "#d38a28" : color.accent,
-                          borderLeftWidth: isConcurrent ? 6 : 4,
-                          boxShadow: isConcurrent
-                            ? "0 0 0 2px rgba(53, 91, 72, 0.18), 0 8px 18px rgba(23, 32, 27, 0.08)"
-                            : undefined,
+                          borderLeftColor: overlapped ? "#d38a28" : color.accent,
+                          borderLeftWidth: 4,
+                          boxShadow: isSplit ? "0 8px 18px rgba(23, 32, 27, 0.1)" : undefined,
                         }}
                       >
                         <div className="flex items-start justify-between gap-2">
@@ -696,30 +699,19 @@ function ScheduleView({
                             <strong className="truncate text-sm">{employee?.name ?? "직원 없음"}</strong>
                           </div>
                           <div className="flex shrink-0 items-center gap-1">
-                            {isConcurrent && (
-                              <span className="rounded bg-moss px-1.5 py-0.5 text-[11px] font-bold text-white">
-                                {concurrentWorkerCount}명
-                              </span>
-                            )}
                             {overlapped && <AlertTriangle size={16} className="text-amber" />}
                           </div>
                         </div>
-                        <div className="mt-2 space-y-1 text-xs text-stone-600">
+                        <div className="mt-1 space-y-0.5 text-xs text-stone-600">
                           <p className="flex items-center gap-1">
                             <Clock size={13} />
                             {shift.startTime} - {shift.endTime}
                           </p>
-                          <p>휴게 {shift.breakMinutes}분</p>
+                          {laneCount === 1 && <p>휴게 {shift.breakMinutes}분</p>}
                           <p className="font-semibold text-ink">실근무 {formatHours(calculateShiftHours(shift))}</p>
                         </div>
-                        {shift.note && (
+                        {shift.note && laneCount === 1 && (
                           <p className="mt-2 rounded bg-white/70 px-2 py-1 text-xs text-stone-700">{shift.note}</p>
-                        )}
-                        {concurrentWorkerCount > 1 && (
-                          <div className="mt-2 rounded border border-moss/20 bg-white/80 px-2 py-1.5">
-                            <p className="text-xs font-bold text-moss">동시근무 {concurrentWorkerCount}명</p>
-                            <p className="mt-0.5 text-xs text-stone-600">{concurrentNames.join(", ")}</p>
-                          </div>
                         )}
                         {overlapped && <p className="mt-2 text-xs font-medium text-amber">시간 겹침</p>}
                       </button>
@@ -923,24 +915,63 @@ function getEmployeePastelColor(employeeId: string) {
   return employeePastelColors[hash % employeePastelColors.length];
 }
 
-function countConcurrentWorkers(target: Shift, dayShifts: Shift[]): number {
-  const employeeIds = new Set(
-    dayShifts
-      .filter((shift) => shiftRangesOverlap(target, shift))
-      .map((shift) => shift.employeeId),
-  );
-  return employeeIds.size;
+interface PositionedShift {
+  shift: Shift;
+  lane: number;
+  laneCount: number;
 }
 
-function getConcurrentEmployeeNames(target: Shift, dayShifts: Shift[], employees: Employee[]): string[] {
-  const employeeIds = Array.from(
-    new Set(
-      dayShifts
-        .filter((shift) => shiftRangesOverlap(target, shift))
-        .map((shift) => shift.employeeId),
-    ),
-  );
-  return employeeIds.map((id) => employees.find((employee) => employee.id === id)?.name ?? "직원 없음");
+function buildPositionedShifts(dayShifts: Shift[]): PositionedShift[] {
+  const sorted = [...dayShifts].sort((a, b) => {
+    const [aStart] = normalizedShiftRange(a);
+    const [bStart] = normalizedShiftRange(b);
+    return aStart - bStart;
+  });
+  const positioned: PositionedShift[] = [];
+  let index = 0;
+
+  while (index < sorted.length) {
+    const cluster: Shift[] = [sorted[index]];
+    let [, clusterEnd] = normalizedShiftRange(sorted[index]);
+    index += 1;
+
+    while (index < sorted.length) {
+      const [nextStart, nextEnd] = normalizedShiftRange(sorted[index]);
+      if (nextStart >= clusterEnd) break;
+      cluster.push(sorted[index]);
+      clusterEnd = Math.max(clusterEnd, nextEnd);
+      index += 1;
+    }
+
+    const laneEnds: number[] = [];
+    const clusterLayout = cluster.map((shift) => {
+      const [start, end] = normalizedShiftRange(shift);
+      const lane = laneEnds.findIndex((laneEnd) => laneEnd <= start);
+      const assignedLane = lane === -1 ? laneEnds.length : lane;
+      laneEnds[assignedLane] = end;
+      return { shift, lane: assignedLane };
+    });
+    const laneCount = Math.max(1, laneEnds.length);
+    positioned.push(...clusterLayout.map((item) => ({ ...item, laneCount })));
+  }
+
+  return positioned;
+}
+
+function getShiftPositionStyle(shift: Shift, lane: number, laneCount: number): React.CSSProperties {
+  const [rawStart, rawEnd] = normalizedShiftRange(shift);
+  const start = Math.max(rawStart, SCHEDULE_START_MINUTES);
+  const end = Math.min(rawEnd, SCHEDULE_END_MINUTES);
+  const top = ((start - SCHEDULE_START_MINUTES) / SCHEDULE_RANGE_MINUTES) * 100;
+  const height = Math.max(((end - start) / SCHEDULE_RANGE_MINUTES) * 100, 6);
+  const columnWidth = 100 / laneCount;
+
+  return {
+    top: `${top}%`,
+    height: `${height}%`,
+    left: `calc(${lane * columnWidth}% + 0.5rem)`,
+    width: `calc(${columnWidth}% - 0.75rem)`,
+  };
 }
 
 function PayrollView({ payroll, employees }: { payroll: ReturnType<typeof calculatePayroll>; employees: Employee[] }) {
