@@ -25,7 +25,6 @@ import {
   formatCurrency,
   formatHours,
   parseTimeToMinutes,
-  summarizeDailyHeadcount,
   weekdays,
 } from "./utils/payroll";
 
@@ -66,7 +65,7 @@ function App() {
   const monthlyLaborCost = payroll.reduce((total, item) => total + item.estimatedMonthlyPay, 0);
   const weeklyHolidayCount = payroll.filter((item) => item.qualifiesForWeeklyHolidayPay).length;
   const nearThreshold = payroll.filter((item) => item.isNearFifteenHours);
-  const dailyHeadcount = summarizeDailyHeadcount(shifts);
+  const weeklyWorkingEmployeeCount = payroll.filter((item) => item.weeklyHours > 0).length;
   const saved = employeesSaved && shiftsSaved;
 
   const updateEmployee = (id: string, patch: Partial<Employee>) => {
@@ -166,8 +165,8 @@ function App() {
                 totalWeeklyHours={totalWeeklyHours}
                 monthlyLaborCost={monthlyLaborCost}
                 weeklyHolidayCount={weeklyHolidayCount}
-                dailyHeadcount={dailyHeadcount}
                 nearThreshold={nearThreshold}
+                weeklyWorkingEmployeeCount={weeklyWorkingEmployeeCount}
               />
             )}
             {activeView === "employees" && (
@@ -210,24 +209,25 @@ function Dashboard({
   totalWeeklyHours,
   monthlyLaborCost,
   weeklyHolidayCount,
-  dailyHeadcount,
   nearThreshold,
+  weeklyWorkingEmployeeCount,
 }: {
   payroll: ReturnType<typeof calculatePayroll>;
   employees: Employee[];
   totalWeeklyHours: number;
   monthlyLaborCost: number;
   weeklyHolidayCount: number;
-  dailyHeadcount: Record<Weekday, number>;
   nearThreshold: ReturnType<typeof calculatePayroll>;
+  weeklyWorkingEmployeeCount: number;
 }) {
   return (
     <>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <MetricCard title="이번 주 총 근무시간" value={formatHours(totalWeeklyHours)} icon={ClipboardList} />
         <MetricCard title="이번 달 예상 인건비" value={formatCurrency(monthlyLaborCost)} icon={WalletCards} />
         <MetricCard title="주휴수당 발생 직원" value={`${weeklyHolidayCount}명`} icon={Users} />
-        <MetricCard title="근무 입력 건수" value={`${payroll.length}명 정산`} icon={CalendarDays} />
+        <MetricCard title="주 15시간 근접 직원" value={`${nearThreshold.length}명`} icon={AlertTriangle} />
+        <MetricCard title="이번 주 총 근무 인원" value={`${weeklyWorkingEmployeeCount}명`} icon={CalendarDays} />
       </div>
 
       {nearThreshold.length > 0 && (
@@ -248,28 +248,7 @@ function Dashboard({
         </div>
       )}
 
-      <div className="grid gap-6 xl:grid-cols-[1.4fr_0.8fr]">
-        <PayrollTable payroll={payroll} employees={employees} />
-        <div className="rounded-md border border-line bg-white p-4">
-          <h3 className="mb-4 font-semibold">요일별 근무 인원</h3>
-          <div className="space-y-3">
-            {weekdays.map((day) => (
-              <div key={day.key} className="flex items-center justify-between">
-                <span className="text-sm text-stone-600">{day.label}</span>
-                <div className="flex items-center gap-3">
-                  <div className="h-2 w-28 overflow-hidden rounded bg-stone-100">
-                    <div
-                      className="h-full bg-moss"
-                      style={{ width: `${Math.min(dailyHeadcount[day.key] * 25, 100)}%` }}
-                    />
-                  </div>
-                  <strong className="w-8 text-right">{dailyHeadcount[day.key]}명</strong>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+      <DashboardPayrollTable payroll={payroll} employees={employees} />
     </>
   );
 }
@@ -284,6 +263,80 @@ function MetricCard({ title, value, icon: Icon }: { title: string; value: string
       <p className="text-2xl font-bold tracking-normal">{value}</p>
     </div>
   );
+}
+
+function DashboardPayrollTable({
+  payroll,
+  employees,
+}: {
+  payroll: ReturnType<typeof calculatePayroll>;
+  employees: Employee[];
+}) {
+  return (
+    <div className="overflow-x-auto rounded-md border border-line bg-white">
+      <table className="min-w-[980px] w-full text-left text-sm">
+        <thead className="bg-stone-50 text-stone-600">
+          <tr>
+            <th className="px-4 py-3">직원명</th>
+            <th className="px-4 py-3">주 근무시간</th>
+            <th className="px-4 py-3">기본 주급</th>
+            <th className="px-4 py-3">주휴수당</th>
+            <th className="px-4 py-3">예상 월급</th>
+            <th className="px-4 py-3">주휴수당 발생 여부</th>
+            <th className="px-4 py-3">경고 상태</th>
+          </tr>
+        </thead>
+        <tbody>
+          {payroll.map((item) => {
+            const employee = employees.find((target) => target.id === item.employeeId);
+            const warning = getDashboardWarning(item.weeklyHours);
+
+            return (
+              <tr
+                key={item.employeeId}
+                className={`border-t border-line ${
+                  item.qualifiesForWeeklyHolidayPay ? "bg-mint/45" : warning.tone === "empty" ? "bg-stone-50" : ""
+                }`}
+              >
+                <td className="px-4 py-3 font-semibold">{employee?.name}</td>
+                <td className="px-4 py-3">{formatHours(item.weeklyHours)}</td>
+                <td className="px-4 py-3">{formatCurrency(item.baseWeeklyPay)}</td>
+                <td className="px-4 py-3 font-medium">{formatCurrency(item.weeklyHolidayPay)}</td>
+                <td className="px-4 py-3 font-bold">{formatCurrency(item.estimatedMonthlyPay)}</td>
+                <td className="px-4 py-3">
+                  <span
+                    className={`rounded px-2 py-1 text-xs font-bold ${
+                      item.qualifiesForWeeklyHolidayPay ? "bg-moss text-white" : "bg-stone-100 text-stone-600"
+                    }`}
+                  >
+                    {item.qualifiesForWeeklyHolidayPay ? "발생" : "미발생"}
+                  </span>
+                </td>
+                <td className="px-4 py-3">
+                  <span className={`rounded px-2 py-1 text-xs font-semibold ${warning.className}`}>
+                    {warning.label}
+                  </span>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function getDashboardWarning(weeklyHours: number): { label: string; tone: "empty" | "near" | "holiday" | "normal"; className: string } {
+  if (weeklyHours === 0) {
+    return { label: "이번 주 근무 없음", tone: "empty", className: "bg-stone-200 text-stone-700" };
+  }
+  if (weeklyHours >= 12 && weeklyHours < 15) {
+    return { label: "주휴 발생 근접", tone: "near", className: "bg-amber/20 text-amber" };
+  }
+  if (weeklyHours >= 15) {
+    return { label: "주휴 발생", tone: "holiday", className: "bg-mint text-moss" };
+  }
+  return { label: "정상", tone: "normal", className: "bg-stone-100 text-stone-600" };
 }
 
 function EmployeesView({
