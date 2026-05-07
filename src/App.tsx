@@ -18,7 +18,7 @@ import {
 import { useMemo, useState } from "react";
 import { sampleEmployees, sampleSettings, sampleShifts } from "./data/sampleData";
 import { useLocalStorage } from "./hooks/useLocalStorage";
-import type { Employee, Shift, Weekday } from "./types";
+import type { Employee, Shift, StoreSettings, Weekday } from "./types";
 import {
   calculatePayroll,
   calculateShiftHours,
@@ -38,8 +38,6 @@ const navItems: Array<{ id: ViewId; label: string; icon: typeof LayoutDashboard 
   { id: "settings", label: "설정", icon: Settings },
 ];
 
-const STORE_NAME = "우지커피 광교상현역점";
-
 const emptyShift = (employeeId: string, weekday: Weekday): Shift => ({
   id: `shift-${Date.now()}`,
   employeeId,
@@ -48,6 +46,12 @@ const emptyShift = (employeeId: string, weekday: Weekday): Shift => ({
   endTime: "13:00",
   breakMinutes: 0,
   repeatsWeekly: true,
+  note: "",
+});
+
+const normalizeSettings = (settings: StoreSettings): StoreSettings => ({
+  ...sampleSettings,
+  ...settings,
 });
 
 function App() {
@@ -57,16 +61,23 @@ function App() {
     sampleEmployees,
   );
   const [shifts, setShifts, shiftsSaved] = useLocalStorage<Shift[]>("cafe-manager-shifts", sampleShifts);
-  const [settings] = useLocalStorage("cafe-manager-settings", sampleSettings);
+  const [storedSettings, setStoredSettings, settingsSaved] = useLocalStorage<StoreSettings>(
+    "cafe-manager-settings",
+    sampleSettings,
+  );
+  const settings = normalizeSettings(storedSettings);
 
   const activeEmployees = employees.filter((employee) => employee.status === "active");
-  const payroll = useMemo(() => calculatePayroll(employees, shifts), [employees, shifts]);
+  const payroll = useMemo(
+    () => calculatePayroll(employees, shifts, settings.monthlyWeekMultiplier),
+    [employees, shifts, settings.monthlyWeekMultiplier],
+  );
   const totalWeeklyHours = payroll.reduce((total, item) => total + item.weeklyHours, 0);
   const monthlyLaborCost = payroll.reduce((total, item) => total + item.estimatedMonthlyPay, 0);
   const weeklyHolidayCount = payroll.filter((item) => item.qualifiesForWeeklyHolidayPay).length;
   const nearThreshold = payroll.filter((item) => item.isNearFifteenHours);
   const weeklyWorkingEmployeeCount = payroll.filter((item) => item.weeklyHours > 0).length;
-  const saved = employeesSaved && shiftsSaved;
+  const saved = employeesSaved && shiftsSaved && settingsSaved;
 
   const updateEmployee = (id: string, patch: Partial<Employee>) => {
     setEmployees(employees.map((employee) => (employee.id === id ? { ...employee, ...patch } : employee)));
@@ -92,6 +103,13 @@ function App() {
 
   const deleteShift = (id: string) => {
     setShifts(shifts.filter((shift) => shift.id !== id));
+  };
+
+  const resetAllData = () => {
+    if (!window.confirm("모든 데이터를 샘플 상태로 초기화할까요? 현재 localStorage 데이터가 덮어써집니다.")) return;
+    setEmployees(sampleEmployees);
+    setShifts(sampleShifts);
+    setStoredSettings(sampleSettings);
   };
 
   return (
@@ -135,7 +153,7 @@ function App() {
                 </button>
                 <div>
                   <p className="text-sm text-stone-500">{settings.baseWeekLabel}</p>
-                  <h2 className="text-xl font-bold md:text-2xl">{STORE_NAME}</h2>
+                  <h2 className="text-xl font-bold md:text-2xl">{settings.storeName}</h2>
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -172,6 +190,7 @@ function App() {
             {activeView === "employees" && (
               <EmployeesView
                 employees={employees}
+                defaultHourlyWage={settings.defaultHourlyWage}
                 onSave={saveEmployee}
                 onDelete={deleteEmployee}
                 onQuickUpdate={updateEmployee}
@@ -186,7 +205,9 @@ function App() {
               />
             )}
             {activeView === "payroll" && <PayrollView payroll={payroll} employees={employees} />}
-            {activeView === "settings" && <SettingsView />}
+            {activeView === "settings" && (
+              <SettingsView settings={settings} onSave={setStoredSettings} onReset={resetAllData} />
+            )}
           </section>
         </main>
       </div>
@@ -344,8 +365,10 @@ function EmployeesView({
   onSave,
   onDelete,
   onQuickUpdate,
+  defaultHourlyWage,
 }: {
   employees: Employee[];
+  defaultHourlyWage: number;
   onSave: (employee: Employee) => void;
   onDelete: (id: string) => void;
   onQuickUpdate: (id: string, patch: Partial<Employee>) => void;
@@ -358,10 +381,11 @@ function EmployeesView({
       id: `emp-${Date.now()}`,
       name: "",
       roleNote: "",
-      hourlyWage: 10030,
+      hourlyWage: defaultHourlyWage,
       startDate: new Date().toISOString().slice(0, 10),
       weeklyHolidayPayEnabled: true,
       status: "active",
+      endDate: "",
     });
     setIsModalOpen(true);
   };
@@ -384,13 +408,14 @@ function EmployeesView({
   return (
     <Panel title="직원 관리" actionLabel="직원 추가" onAction={openAddModal}>
       <div className="overflow-x-auto rounded-md border border-line bg-white">
-        <table className="min-w-[820px] w-full text-left text-sm">
+        <table className="min-w-[980px] w-full text-left text-sm">
           <thead className="bg-stone-50 text-stone-600">
             <tr>
               <th className="px-4 py-3">이름</th>
               <th className="px-4 py-3">시급</th>
               <th className="px-4 py-3">주휴수당</th>
               <th className="px-4 py-3">입사일</th>
+              <th className="px-4 py-3">퇴사일</th>
               <th className="px-4 py-3">상태</th>
               <th className="px-4 py-3 text-right">관리</th>
             </tr>
@@ -416,6 +441,7 @@ function EmployeesView({
                   </label>
                 </td>
                 <td className="px-4 py-3">{employee.startDate}</td>
+                <td className="px-4 py-3">{employee.endDate || "-"}</td>
                 <td className="px-4 py-3">
                   <span
                     className={`rounded px-2 py-1 text-xs font-medium ${
@@ -514,6 +540,13 @@ function EmployeeModal({
               type="date"
               value={draft.startDate}
               onChange={(event) => updateDraft({ startDate: event.target.value })}
+            />
+          </Field>
+          <Field label="퇴사일">
+            <input
+              type="date"
+              value={draft.endDate ?? ""}
+              onChange={(event) => updateDraft({ endDate: event.target.value })}
             />
           </Field>
           <Field label="상태">
@@ -648,6 +681,9 @@ function ScheduleView({
                           <p>휴게 {shift.breakMinutes}분</p>
                           <p className="font-semibold text-ink">실근무 {formatHours(calculateShiftHours(shift))}</p>
                         </div>
+                        {shift.note && (
+                          <p className="mt-2 rounded bg-white/70 px-2 py-1 text-xs text-stone-700">{shift.note}</p>
+                        )}
                         {overlapped && <p className="mt-2 text-xs font-medium text-amber">시간 겹침</p>}
                       </button>
                     );
@@ -701,6 +737,7 @@ function ShiftModal({
     onSave({
       ...draft,
       breakMinutes: Math.max(0, Number(draft.breakMinutes) || 0),
+      note: (draft.note ?? "").trim(),
     });
   };
 
@@ -766,6 +803,13 @@ function ShiftModal({
             />
             반복 근무 패턴
           </label>
+          <Field label="대타/결근 메모">
+            <input
+              value={draft.note ?? ""}
+              onChange={(event) => updateDraft({ note: event.target.value })}
+              placeholder="예: 대타, 결근, 마감 지원"
+            />
+          </Field>
           {overlappedShifts.length > 0 && (
             <div className="rounded-md border border-amber/40 bg-amber/10 p-3 text-sm text-stone-800 sm:col-span-2">
               <div className="flex items-start gap-2">
@@ -827,11 +871,41 @@ function normalizedShiftRange(shift: Shift): [number, number] {
 }
 
 function PayrollView({ payroll, employees }: { payroll: ReturnType<typeof calculatePayroll>; employees: Employee[] }) {
+  const exportPayrollCsv = () => {
+    const rows = [
+      ["직원명", "주근무시간", "기본주급", "주휴시간", "주휴수당", "월예상급여", "주휴발생여부"],
+      ...payroll.map((item) => {
+        const employee = employees.find((target) => target.id === item.employeeId);
+        return [
+          employee?.name ?? "",
+          item.weeklyHours.toFixed(2),
+          Math.round(item.baseWeeklyPay).toString(),
+          item.weeklyHolidayHours.toFixed(2),
+          Math.round(item.weeklyHolidayPay).toString(),
+          Math.round(item.estimatedMonthlyPay).toString(),
+          item.qualifiesForWeeklyHolidayPay ? "발생" : "미발생",
+        ];
+      }),
+    ];
+    const csv = rows.map((row) => row.map(escapeCsvValue).join(",")).join("\n");
+    const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "cafe-payroll.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
-    <Panel title="급여 계산">
+    <Panel title="급여 계산" actionLabel="CSV 내보내기" onAction={exportPayrollCsv}>
       <PayrollTable payroll={payroll} employees={employees} showDetails />
     </Panel>
   );
+}
+
+function escapeCsvValue(value: string): string {
+  return `"${value.replace(/"/g, "\"\"")}"`;
 }
 
 function PayrollTable({
@@ -886,9 +960,63 @@ function PayrollTable({
   );
 }
 
-function SettingsView() {
+function SettingsView({
+  settings,
+  onSave,
+  onReset,
+}: {
+  settings: StoreSettings;
+  onSave: (settings: StoreSettings) => void;
+  onReset: () => void;
+}) {
+  const updateSettings = (patch: Partial<StoreSettings>) => {
+    onSave({ ...settings, ...patch });
+  };
+
   return (
     <Panel title="설정">
+      <div className="grid gap-4 rounded-md border border-line bg-white p-4 md:grid-cols-2">
+        <Field label="매장명">
+          <input value={settings.storeName} onChange={(event) => updateSettings({ storeName: event.target.value })} />
+        </Field>
+        <Field label="기준 주차">
+          <input value={settings.baseWeekLabel} onChange={(event) => updateSettings({ baseWeekLabel: event.target.value })} />
+        </Field>
+        <Field label="기준 시급">
+          <input
+            type="number"
+            min="0"
+            step="10"
+            value={settings.defaultHourlyWage}
+            onChange={(event) => updateSettings({ defaultHourlyWage: Number(event.target.value) })}
+          />
+          <span className="text-xs text-stone-500">{settings.defaultHourlyWage.toLocaleString("ko-KR")}원</span>
+        </Field>
+        <Field label="월 환산 계수">
+          <input
+            type="number"
+            min="0"
+            step="0.001"
+            value={settings.monthlyWeekMultiplier}
+            onChange={(event) => updateSettings({ monthlyWeekMultiplier: Number(event.target.value) })}
+          />
+        </Field>
+        <Field label="주휴수당 계산 방식">
+          <input
+            value={settings.weeklyHolidayCalculation}
+            onChange={(event) => updateSettings({ weeklyHolidayCalculation: event.target.value })}
+          />
+        </Field>
+        <div className="flex items-end">
+          <button
+            type="button"
+            onClick={onReset}
+            className="rounded-md border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
+          >
+            데이터 초기화
+          </button>
+        </div>
+      </div>
       <div className="rounded-md border border-line bg-white p-4 text-sm text-stone-700">
         현재 MVP는 로그인과 서버 DB 없이 브라우저 localStorage에 저장됩니다. 이후 Supabase 또는 Firebase 도입 시
         직원, 근무표, 매장 설정 저장소를 API 어댑터로 교체하는 구조로 확장할 수 있습니다.

@@ -3,6 +3,9 @@ import type { Employee, Shift, StoreSettings } from "../types";
 export const sampleSettings: StoreSettings = {
   storeName: "우지커피 광교상현역점",
   baseWeekLabel: "2026년 5월 2주차",
+  defaultHourlyWage: 10030,
+  monthlyWeekMultiplier: 4.345,
+  weeklyHolidayCalculation: "주 15시간 이상이면 min((주 실근무시간 / 40) * 8, 8) 시간분 지급",
 };
 
 export const sampleEmployees: Employee[] = [
@@ -45,14 +48,14 @@ export const sampleEmployees: Employee[] = [
 ];
 
 export const sampleShifts: Shift[] = [
-  { id: "shift-1", employeeId: "emp-1", weekday: "mon", startTime: "08:00", endTime: "14:00", breakMinutes: 30, repeatsWeekly: true },
+  { id: "shift-1", employeeId: "emp-1", weekday: "mon", startTime: "08:00", endTime: "14:00", breakMinutes: 30, repeatsWeekly: true, note: "오픈" },
   { id: "shift-2", employeeId: "emp-1", weekday: "wed", startTime: "08:00", endTime: "14:00", breakMinutes: 30, repeatsWeekly: true },
   { id: "shift-3", employeeId: "emp-1", weekday: "fri", startTime: "08:00", endTime: "13:00", breakMinutes: 0, repeatsWeekly: true },
-  { id: "shift-4", employeeId: "emp-2", weekday: "tue", startTime: "15:00", endTime: "22:00", breakMinutes: 60, repeatsWeekly: true },
+  { id: "shift-4", employeeId: "emp-2", weekday: "tue", startTime: "15:00", endTime: "22:00", breakMinutes: 60, repeatsWeekly: true, note: "마감" },
   { id: "shift-5", employeeId: "emp-2", weekday: "thu", startTime: "15:00", endTime: "22:00", breakMinutes: 60, repeatsWeekly: true },
   { id: "shift-6", employeeId: "emp-2", weekday: "sun", startTime: "13:00", endTime: "19:00", breakMinutes: 30, repeatsWeekly: true },
-  { id: "shift-7", employeeId: "emp-3", weekday: "sat", startTime: "10:00", endTime: "18:00", breakMinutes: 60, repeatsWeekly: true },
+  { id: "shift-7", employeeId: "emp-3", weekday: "sat", startTime: "10:00", endTime: "18:00", breakMinutes: 60, repeatsWeekly: true, note: "주말" },
   { id: "shift-8", employeeId: "emp-3", weekday: "sun", startTime: "10:00", endTime: "18:00", breakMinutes: 60, repeatsWeekly: true },
-  { id: "shift-9", employeeId: "emp-4", weekday: "mon", startTime: "14:00", endTime: "18:00", breakMinutes: 0, repeatsWeekly: true },
+  { id: "shift-9", employeeId: "emp-4", weekday: "mon", startTime: "14:00", endTime: "18:00", breakMinutes: 0, repeatsWeekly: true, note: "대타 가능" },
   { id: "shift-10", employeeId: "emp-4", weekday: "thu", startTime: "10:00", endTime: "15:00", breakMinutes: 30, repeatsWeekly: true },
 ];

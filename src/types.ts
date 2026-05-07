@@ -8,6 +8,7 @@ export interface Employee {
   roleNote: string;
   hourlyWage: number;
   startDate: string;
+  endDate?: string;
   weeklyHolidayPayEnabled: boolean;
   status: EmployeeStatus;
 }
@@ -20,11 +21,15 @@ export interface Shift {
   endTime: string;
   breakMinutes: number;
   repeatsWeekly: boolean;
+  note?: string;
 }
 
 export interface StoreSettings {
   storeName: string;
   baseWeekLabel: string;
+  defaultHourlyWage: number;
+  monthlyWeekMultiplier: number;
+  weeklyHolidayCalculation: string;
 }
 
 export interface EmployeePayroll {

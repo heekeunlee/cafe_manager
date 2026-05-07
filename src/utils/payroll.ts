@@ -44,7 +44,11 @@ export function calculateWeeklyHolidayPay(employee: Employee, weeklyHours: numbe
   return calculateWeeklyHolidayHours(employee, weeklyHours) * employee.hourlyWage;
 }
 
-export function calculateEmployeePayroll(employee: Employee, shifts: Shift[]): EmployeePayroll {
+export function calculateEmployeePayroll(
+  employee: Employee,
+  shifts: Shift[],
+  monthlyWeekMultiplier = MONTHLY_WEEK_MULTIPLIER,
+): EmployeePayroll {
   const weeklyHours = calculateWeeklyHours(employee.id, shifts);
   const baseWeeklyPay = weeklyHours * employee.hourlyWage;
   const weeklyHolidayHours = calculateWeeklyHolidayHours(employee, weeklyHours);
@@ -58,16 +62,20 @@ export function calculateEmployeePayroll(employee: Employee, shifts: Shift[]): E
     weeklyHolidayHours,
     weeklyHolidayPay,
     weeklyTotalPay,
-    estimatedMonthlyPay: weeklyTotalPay * MONTHLY_WEEK_MULTIPLIER,
+    estimatedMonthlyPay: weeklyTotalPay * monthlyWeekMultiplier,
     qualifiesForWeeklyHolidayPay: weeklyHolidayPay > 0,
     isNearFifteenHours: weeklyHours >= 12 && weeklyHours < 15,
   };
 }
 
-export function calculatePayroll(employees: Employee[], shifts: Shift[]): EmployeePayroll[] {
+export function calculatePayroll(
+  employees: Employee[],
+  shifts: Shift[],
+  monthlyWeekMultiplier = MONTHLY_WEEK_MULTIPLIER,
+): EmployeePayroll[] {
   return employees
     .filter((employee) => employee.status === "active")
-    .map((employee) => calculateEmployeePayroll(employee, shifts));
+    .map((employee) => calculateEmployeePayroll(employee, shifts, monthlyWeekMultiplier));
 }
 
 export function summarizeDailyHeadcount(shifts: Shift[]): Record<Weekday, number> {
