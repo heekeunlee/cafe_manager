@@ -631,6 +631,10 @@ function ScheduleView({
               .filter((shift) => shift.weekday === day.key)
               .sort((a, b) => a.startTime.localeCompare(b.startTime));
             const dayHours = dayShifts.reduce((total, shift) => total + calculateShiftHours(shift), 0);
+            const maxConcurrentWorkers = Math.max(
+              0,
+              ...dayShifts.map((shift) => countConcurrentWorkers(shift, dayShifts)),
+            );
 
             return (
               <section key={day.key} className="min-h-[520px] rounded-md border border-line bg-white">
@@ -641,6 +645,12 @@ function ScheduleView({
                       <p className="mt-1 text-xs text-stone-500">
                         {dayShifts.length}건 · {formatHours(dayHours)}
                       </p>
+                      {maxConcurrentWorkers > 1 && (
+                        <p className="mt-2 inline-flex items-center gap-1 rounded bg-moss px-2 py-1 text-xs font-semibold text-white">
+                          <Users size={13} />
+                          최대 동시 {maxConcurrentWorkers}명
+                        </p>
+                      )}
                     </div>
                     <button
                       onClick={() => openAddModal(day.key)}
@@ -661,7 +671,9 @@ function ScheduleView({
                     const employee = employees.find((target) => target.id === shift.employeeId);
                     const overlapped = hasOverlap(shift);
                     const concurrentWorkerCount = countConcurrentWorkers(shift, dayShifts);
+                    const concurrentNames = getConcurrentEmployeeNames(shift, dayShifts, employees);
                     const color = getEmployeePastelColor(shift.employeeId);
+                    const isConcurrent = concurrentWorkerCount > 1;
 
                     return (
                       <button
@@ -671,6 +683,11 @@ function ScheduleView({
                         style={{
                           backgroundColor: overlapped ? "#fff4dd" : color.background,
                           borderColor: overlapped ? "#d38a28" : color.border,
+                          borderLeftColor: isConcurrent ? "#355b48" : overlapped ? "#d38a28" : color.accent,
+                          borderLeftWidth: isConcurrent ? 6 : 4,
+                          boxShadow: isConcurrent
+                            ? "0 0 0 2px rgba(53, 91, 72, 0.18), 0 8px 18px rgba(23, 32, 27, 0.08)"
+                            : undefined,
                         }}
                       >
                         <div className="flex items-start justify-between gap-2">
@@ -678,7 +695,14 @@ function ScheduleView({
                             <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color.accent }} />
                             <strong className="truncate text-sm">{employee?.name ?? "직원 없음"}</strong>
                           </div>
-                          {overlapped && <AlertTriangle size={16} className="shrink-0 text-amber" />}
+                          <div className="flex shrink-0 items-center gap-1">
+                            {isConcurrent && (
+                              <span className="rounded bg-moss px-1.5 py-0.5 text-[11px] font-bold text-white">
+                                {concurrentWorkerCount}명
+                              </span>
+                            )}
+                            {overlapped && <AlertTriangle size={16} className="text-amber" />}
+                          </div>
                         </div>
                         <div className="mt-2 space-y-1 text-xs text-stone-600">
                           <p className="flex items-center gap-1">
@@ -692,9 +716,10 @@ function ScheduleView({
                           <p className="mt-2 rounded bg-white/70 px-2 py-1 text-xs text-stone-700">{shift.note}</p>
                         )}
                         {concurrentWorkerCount > 1 && (
-                          <p className="mt-2 inline-flex rounded bg-white/75 px-2 py-1 text-xs font-medium text-moss">
-                            동시간 {concurrentWorkerCount}명
-                          </p>
+                          <div className="mt-2 rounded border border-moss/20 bg-white/80 px-2 py-1.5">
+                            <p className="text-xs font-bold text-moss">동시근무 {concurrentWorkerCount}명</p>
+                            <p className="mt-0.5 text-xs text-stone-600">{concurrentNames.join(", ")}</p>
+                          </div>
                         )}
                         {overlapped && <p className="mt-2 text-xs font-medium text-amber">시간 겹침</p>}
                       </button>
@@ -905,6 +930,17 @@ function countConcurrentWorkers(target: Shift, dayShifts: Shift[]): number {
       .map((shift) => shift.employeeId),
   );
   return employeeIds.size;
+}
+
+function getConcurrentEmployeeNames(target: Shift, dayShifts: Shift[], employees: Employee[]): string[] {
+  const employeeIds = Array.from(
+    new Set(
+      dayShifts
+        .filter((shift) => shiftRangesOverlap(target, shift))
+        .map((shift) => shift.employeeId),
+    ),
+  );
+  return employeeIds.map((id) => employees.find((employee) => employee.id === id)?.name ?? "직원 없음");
 }
 
 function PayrollView({ payroll, employees }: { payroll: ReturnType<typeof calculatePayroll>; employees: Employee[] }) {
