@@ -386,6 +386,7 @@ function EmployeesView({
       id: `emp-${Date.now()}`,
       name: "",
       roleNote: "",
+      color: getEmployeePastelColor(`emp-${Date.now()}`).accent,
       hourlyWage: defaultHourlyWage,
       startDate: new Date().toISOString().slice(0, 10),
       weeklyHolidayPayEnabled: true,
@@ -413,10 +414,11 @@ function EmployeesView({
   return (
     <Panel title="직원 관리" actionLabel="직원 추가" onAction={openAddModal}>
       <div className="overflow-x-auto rounded-md border border-line bg-white">
-        <table className="min-w-[980px] w-full text-left text-sm">
+        <table className="min-w-[1040px] w-full text-left text-sm">
           <thead className="bg-stone-50 text-stone-600">
             <tr>
               <th className="px-4 py-3">이름</th>
+              <th className="px-4 py-3">색상</th>
               <th className="px-4 py-3">시급</th>
               <th className="px-4 py-3">주휴수당</th>
               <th className="px-4 py-3">입사일</th>
@@ -431,6 +433,15 @@ function EmployeesView({
                 <td className="px-4 py-3">
                   <div className="font-medium">{employee.name}</div>
                   {employee.roleNote && <div className="mt-1 text-xs text-stone-500">{employee.roleNote}</div>}
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="h-5 w-5 rounded-full border border-line"
+                      style={{ backgroundColor: getEmployeeScheduleColor(employee).accent }}
+                    />
+                    <span className="text-xs text-stone-500">{getEmployeeScheduleColor(employee).accent}</span>
+                  </div>
                 </td>
                 <td className="px-4 py-3 font-medium">{employee.hourlyWage.toLocaleString("ko-KR")}원</td>
                 <td className="px-4 py-3">
@@ -508,6 +519,7 @@ function EmployeeModal({
       ...draft,
       name: draft.name.trim() || "이름 없음",
       roleNote: draft.roleNote.trim(),
+      color: draft.color || getEmployeePastelColor(draft.id).accent,
       hourlyWage: Math.max(0, Number(draft.hourlyWage) || 0),
     });
   };
@@ -539,6 +551,17 @@ function EmployeeModal({
               onChange={(event) => updateDraft({ hourlyWage: Number(event.target.value) })}
             />
             <span className="text-xs text-stone-500">표시: {draft.hourlyWage.toLocaleString("ko-KR")}원</span>
+          </Field>
+          <Field label="근무표 색상">
+            <div className="flex items-center gap-3">
+              <input
+                type="color"
+                value={draft.color || getEmployeePastelColor(draft.id).accent}
+                onChange={(event) => updateDraft({ color: event.target.value })}
+                className="h-10 w-14 p-1"
+              />
+              <span className="text-xs text-stone-500">{draft.color || getEmployeePastelColor(draft.id).accent}</span>
+            </div>
           </Field>
           <Field label="입사일">
             <input
@@ -675,7 +698,7 @@ function ScheduleView({
                   {positionedShifts.map(({ shift, lane, laneCount }) => {
                     const employee = employees.find((target) => target.id === shift.employeeId);
                     const overlapped = hasOverlap(shift);
-                    const color = getEmployeePastelColor(shift.employeeId);
+                    const color = getEmployeeScheduleColor(employee, shift.employeeId);
                     const isSplit = laneCount > 1;
                     const position = getShiftPositionStyle(shift, lane, laneCount);
 
@@ -913,6 +936,33 @@ const employeePastelColors = [
 function getEmployeePastelColor(employeeId: string) {
   const hash = Array.from(employeeId).reduce((total, char) => total + char.charCodeAt(0), 0);
   return employeePastelColors[hash % employeePastelColors.length];
+}
+
+function getEmployeeScheduleColor(employee?: Employee, fallbackId = "employee") {
+  if (!employee?.color || !/^#[0-9a-fA-F]{6}$/.test(employee.color)) {
+    return getEmployeePastelColor(fallbackId);
+  }
+
+  return {
+    accent: employee.color,
+    border: mixHexColors(employee.color, "#ffffff", 0.45),
+    background: mixHexColors(employee.color, "#ffffff", 0.82),
+  };
+}
+
+function mixHexColors(base: string, mix: string, amount: number): string {
+  const baseRgb = hexToRgb(base);
+  const mixRgb = hexToRgb(mix);
+  const mixed = baseRgb.map((value, index) => Math.round(value * (1 - amount) + mixRgb[index] * amount));
+  return `#${mixed.map((value) => value.toString(16).padStart(2, "0")).join("")}`;
+}
+
+function hexToRgb(value: string): [number, number, number] {
+  return [
+    Number.parseInt(value.slice(1, 3), 16),
+    Number.parseInt(value.slice(3, 5), 16),
+    Number.parseInt(value.slice(5, 7), 16),
+  ];
 }
 
 interface PositionedShift {

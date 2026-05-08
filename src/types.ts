@@ -6,6 +6,7 @@ export interface Employee {
   id: string;
   name: string;
   roleNote: string;
+  color?: string;
   hourlyWage: number;
   startDate: string;
   endDate?: string;
