@@ -59,6 +59,11 @@ const normalizeSettings = (settings: StoreSettings): StoreSettings => ({
   ...settings,
 });
 
+const normalizeEmployee = (employee: Employee): Employee => ({
+  ...employee,
+  color: employee.color || getEmployeePastelColor(employee.id).accent,
+});
+
 function App() {
   const [activeView, setActiveView] = useState<ViewId>("dashboard");
   const [employees, setEmployees, employeesSaved] = useLocalStorage<Employee[]>(
@@ -71,30 +76,36 @@ function App() {
     sampleSettings,
   );
   const settings = normalizeSettings(storedSettings);
+  const normalizedEmployees = useMemo(() => employees.map(normalizeEmployee), [employees]);
 
-  const activeEmployees = employees.filter((employee) => employee.status === "active");
+  const activeEmployees = normalizedEmployees.filter((employee) => employee.status === "active");
   const payroll = useMemo(
-    () => calculatePayroll(employees, shifts, settings.monthlyWeekMultiplier),
-    [employees, shifts, settings.monthlyWeekMultiplier],
+    () => calculatePayroll(normalizedEmployees, shifts, settings.monthlyWeekMultiplier),
+    [normalizedEmployees, shifts, settings.monthlyWeekMultiplier],
   );
   const totalWeeklyHours = payroll.reduce((total, item) => total + item.weeklyHours, 0);
   const monthlyLaborCost = payroll.reduce((total, item) => total + item.estimatedMonthlyPay, 0);
-  const weeklyHolidayCount = payroll.filter((item) => item.qualifiesForWeeklyHolidayPay).length;
+  const weeklyHolidayEnabledCount = activeEmployees.filter((employee) => employee.weeklyHolidayPayEnabled).length;
   const nearThreshold = payroll.filter((item) => item.isNearFifteenHours);
   const weeklyWorkingEmployeeCount = payroll.filter((item) => item.weeklyHours > 0).length;
   const saved = employeesSaved && shiftsSaved && settingsSaved;
 
   const updateEmployee = (id: string, patch: Partial<Employee>) => {
-    setEmployees(employees.map((employee) => (employee.id === id ? { ...employee, ...patch } : employee)));
+    setEmployees(employees.map((employee) => (employee.id === id ? normalizeEmployee({ ...employee, ...patch }) : employee)));
   };
 
   const saveEmployee = (employee: Employee) => {
+    const normalizedEmployee = normalizeEmployee(employee);
     const exists = employees.some((target) => target.id === employee.id);
-    setEmployees(exists ? employees.map((target) => (target.id === employee.id ? employee : target)) : [...employees, employee]);
+    setEmployees(
+      exists
+        ? employees.map((target) => (target.id === employee.id ? normalizedEmployee : target))
+        : [...employees, normalizedEmployee],
+    );
   };
 
   const deleteEmployee = (id: string) => {
-    const target = employees.find((employee) => employee.id === id);
+    const target = normalizedEmployees.find((employee) => employee.id === id);
     if (!target) return;
     if (!window.confirm(`${target.name} 직원을 삭제할까요? 관련 근무표도 함께 삭제됩니다.`)) return;
     setEmployees(employees.filter((employee) => employee.id !== id));
@@ -184,17 +195,17 @@ function App() {
             {activeView === "dashboard" && (
               <Dashboard
                 payroll={payroll}
-                employees={employees}
+                employees={normalizedEmployees}
                 totalWeeklyHours={totalWeeklyHours}
                 monthlyLaborCost={monthlyLaborCost}
-                weeklyHolidayCount={weeklyHolidayCount}
+                weeklyHolidayEnabledCount={weeklyHolidayEnabledCount}
                 nearThreshold={nearThreshold}
                 weeklyWorkingEmployeeCount={weeklyWorkingEmployeeCount}
               />
             )}
             {activeView === "employees" && (
               <EmployeesView
-                employees={employees}
+                employees={normalizedEmployees}
                 defaultHourlyWage={settings.defaultHourlyWage}
                 onSave={saveEmployee}
                 onDelete={deleteEmployee}
@@ -209,7 +220,7 @@ function App() {
                 onDeleteShift={deleteShift}
               />
             )}
-            {activeView === "payroll" && <PayrollView payroll={payroll} employees={employees} />}
+            {activeView === "payroll" && <PayrollView payroll={payroll} employees={normalizedEmployees} />}
             {activeView === "settings" && (
               <SettingsView settings={settings} onSave={setStoredSettings} onReset={resetAllData} />
             )}
@@ -234,7 +245,7 @@ function Dashboard({
   employees,
   totalWeeklyHours,
   monthlyLaborCost,
-  weeklyHolidayCount,
+  weeklyHolidayEnabledCount,
   nearThreshold,
   weeklyWorkingEmployeeCount,
 }: {
@@ -242,7 +253,7 @@ function Dashboard({
   employees: Employee[];
   totalWeeklyHours: number;
   monthlyLaborCost: number;
-  weeklyHolidayCount: number;
+  weeklyHolidayEnabledCount: number;
   nearThreshold: ReturnType<typeof calculatePayroll>;
   weeklyWorkingEmployeeCount: number;
 }) {
@@ -251,7 +262,7 @@ function Dashboard({
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <MetricCard title="이번 주 총 근무시간" value={formatHours(totalWeeklyHours)} icon={ClipboardList} />
         <MetricCard title="이번 달 예상 인건비" value={formatCurrency(monthlyLaborCost)} icon={WalletCards} />
-        <MetricCard title="주휴수당 발생 직원" value={`${weeklyHolidayCount}명`} icon={Users} />
+        <MetricCard title="주휴수당 적용 직원" value={`${weeklyHolidayEnabledCount}명`} icon={Users} />
         <MetricCard title="주 15시간 근접 직원" value={`${nearThreshold.length}명`} icon={AlertTriangle} />
         <MetricCard title="이번 주 총 근무 인원" value={`${weeklyWorkingEmployeeCount}명`} icon={CalendarDays} />
       </div>
@@ -382,11 +393,12 @@ function EmployeesView({
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const openAddModal = () => {
+    const id = `emp-${Date.now()}`;
     setEditingEmployee({
-      id: `emp-${Date.now()}`,
+      id,
       name: "",
       roleNote: "",
-      color: getEmployeePastelColor(`emp-${Date.now()}`).accent,
+      color: getEmployeePastelColor(id).accent,
       hourlyWage: defaultHourlyWage,
       startDate: new Date().toISOString().slice(0, 10),
       weeklyHolidayPayEnabled: true,
