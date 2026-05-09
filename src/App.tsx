@@ -51,8 +51,6 @@ const emptyShift = (employeeId: string, weekday: Weekday): Shift => ({
 const SCHEDULE_START_MINUTES = 7 * 60;
 const SCHEDULE_END_MINUTES = 23 * 60;
 const SCHEDULE_RANGE_MINUTES = SCHEDULE_END_MINUTES - SCHEDULE_START_MINUTES;
-const BASE_DAY_COLUMN_WIDTH = 360;
-const SHIFT_LANE_WIDTH = 188;
 const scheduleHourMarks = Array.from({ length: 9 }, (_, index) => 7 + index * 2);
 
 const normalizeSettings = (settings: StoreSettings): StoreSettings => ({
@@ -625,6 +623,7 @@ function ScheduleView({
   onDeleteShift: (id: string) => void;
 }) {
   const [editingShift, setEditingShift] = useState<Shift | null>(null);
+  const [selectedWeekday, setSelectedWeekday] = useState<Weekday>("mon");
 
   const openAddModal = (weekday: Weekday = "mon") => {
     const firstEmployee = employees[0];
@@ -646,108 +645,122 @@ function ScheduleView({
   };
 
   const hasOverlap = (shift: Shift) => findOverlappingShifts(shift, shifts).length > 0;
+  const selectedDay = weekdays.find((day) => day.key === selectedWeekday) ?? weekdays[0];
+  const selectedDayShifts = shifts
+    .filter((shift) => shift.weekday === selectedWeekday)
+    .sort((a, b) => a.startTime.localeCompare(b.startTime));
+  const selectedPositionedShifts = buildPositionedShifts(selectedDayShifts);
+  const selectedDayHours = selectedDayShifts.reduce((total, shift) => total + calculateShiftHours(shift), 0);
 
   return (
     <Panel title="근무표 관리" actionLabel="근무 추가" onAction={() => openAddModal()}>
-      <div className="overflow-x-auto">
-        <div className="flex min-w-max gap-3">
-          {weekdays.map((day) => {
-            const dayShifts = shifts
-              .filter((shift) => shift.weekday === day.key)
-              .sort((a, b) => a.startTime.localeCompare(b.startTime));
-            const positionedShifts = buildPositionedShifts(dayShifts);
-            const dayWidth = getScheduleDayWidth(positionedShifts);
-            const dayHours = dayShifts.reduce((total, shift) => total + calculateShiftHours(shift), 0);
+      <div className="grid grid-cols-7 gap-3">
+        {weekdays.map((day) => {
+          const dayShifts = shifts.filter((shift) => shift.weekday === day.key);
+          const dayHours = dayShifts.reduce((total, shift) => total + calculateShiftHours(shift), 0);
+          const isSelected = day.key === selectedWeekday;
+
+          return (
+            <button
+              key={day.key}
+              type="button"
+              onClick={() => setSelectedWeekday(day.key)}
+              className={`rounded-md border px-4 py-3 text-left transition ${
+                isSelected ? "border-moss bg-mint text-moss shadow-sm" : "border-line bg-white hover:border-moss"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <h4 className="font-semibold">{day.label}</h4>
+                <span className={`rounded px-2 py-1 text-xs font-semibold ${isSelected ? "bg-white text-moss" : "bg-stone-100 text-stone-600"}`}>
+                  {dayShifts.length}건
+                </span>
+              </div>
+              <p className="mt-2 text-sm text-stone-600">{formatHours(dayHours)}</p>
+            </button>
+          );
+        })}
+      </div>
+
+      <section className="rounded-md border border-line bg-white">
+        <div className="border-b border-line bg-stone-50 px-4 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h4 className="text-lg font-bold">{selectedDay.label} 상세 근무표</h4>
+              <p className="mt-1 text-sm text-stone-500">
+                {selectedDayShifts.length}건 · {formatHours(selectedDayHours)}
+              </p>
+            </div>
+            <button
+              onClick={() => openAddModal(selectedWeekday)}
+              className="grid h-9 w-9 place-items-center rounded-md border border-line bg-white text-moss hover:border-moss"
+              aria-label={`${selectedDay.label} 근무 추가`}
+            >
+              <Plus size={16} />
+            </button>
+          </div>
+        </div>
+        <div className="relative h-[720px] overflow-hidden p-3">
+          {scheduleHourMarks.map((hour) => (
+            <div
+              key={hour}
+              className="pointer-events-none absolute left-3 right-3 border-t border-stone-100"
+              style={{ top: `${((hour * 60 - SCHEDULE_START_MINUTES) / SCHEDULE_RANGE_MINUTES) * 100}%` }}
+            >
+              <span className="absolute -top-2 bg-white pr-2 text-[11px] text-stone-400">{`${hour}:00`}</span>
+            </div>
+          ))}
+          {selectedDayShifts.length === 0 && (
+            <div className="absolute inset-x-3 top-16 rounded-md border border-dashed border-line px-3 py-8 text-center text-sm text-stone-500">
+              근무 없음
+            </div>
+          )}
+          {selectedPositionedShifts.map(({ shift, lane, laneCount }) => {
+            const employee = employees.find((target) => target.id === shift.employeeId);
+            const overlapped = hasOverlap(shift);
+            const color = getEmployeeScheduleColor(employee, shift.employeeId);
+            const isSplit = laneCount > 1;
+            const position = getShiftPositionStyle(shift, lane, laneCount);
 
             return (
-              <section
-                key={day.key}
-                className="min-h-[520px] shrink-0 rounded-md border border-line bg-white"
-                style={{ width: dayWidth }}
+              <button
+                key={shift.id}
+                onClick={() => openEditModal(shift)}
+                className="absolute overflow-hidden rounded-md border p-3 text-left shadow-sm transition hover:z-10 hover:-translate-y-0.5 hover:shadow"
+                style={{
+                  ...position,
+                  backgroundColor: overlapped ? "#fff4dd" : color.background,
+                  borderColor: overlapped ? "#d38a28" : color.border,
+                  borderLeftColor: overlapped ? "#d38a28" : color.accent,
+                  borderLeftWidth: 5,
+                  boxShadow: isSplit ? "0 8px 18px rgba(23, 32, 27, 0.1)" : undefined,
+                }}
               >
-                <div className="border-b border-line bg-stone-50 px-3 py-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <div>
-                      <h4 className="font-semibold">{day.label}</h4>
-                      <p className="mt-1 text-xs text-stone-500">
-                        {dayShifts.length}건 · {formatHours(dayHours)}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => openAddModal(day.key)}
-                      className="grid h-8 w-8 place-items-center rounded-md border border-line bg-white text-moss hover:border-moss"
-                      aria-label={`${day.label} 근무 추가`}
-                    >
-                      <Plus size={15} />
-                    </button>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: color.accent }} />
+                    <strong className="truncate text-base">{employee?.name ?? "직원 없음"}</strong>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    {overlapped && <AlertTriangle size={17} className="text-amber" />}
                   </div>
                 </div>
-                <div className="relative h-[680px] overflow-hidden p-2">
-                  {scheduleHourMarks.map((hour) => (
-                    <div
-                      key={hour}
-                      className="pointer-events-none absolute left-2 right-2 border-t border-stone-100"
-                      style={{ top: `${((hour * 60 - SCHEDULE_START_MINUTES) / SCHEDULE_RANGE_MINUTES) * 100}%` }}
-                    >
-                      <span className="absolute -top-2 bg-white pr-1 text-[10px] text-stone-400">{`${hour}:00`}</span>
-                    </div>
-                  ))}
-                  {dayShifts.length === 0 && (
-                    <div className="absolute inset-x-2 top-16 rounded-md border border-dashed border-line px-3 py-8 text-center text-xs text-stone-500">
-                      근무 없음
-                    </div>
-                  )}
-                  {positionedShifts.map(({ shift, lane, laneCount }) => {
-                    const employee = employees.find((target) => target.id === shift.employeeId);
-                    const overlapped = hasOverlap(shift);
-                    const color = getEmployeeScheduleColor(employee, shift.employeeId);
-                    const isSplit = laneCount > 1;
-                    const position = getShiftPositionStyle(shift, lane, laneCount);
-
-                    return (
-                      <button
-                        key={shift.id}
-                        onClick={() => openEditModal(shift)}
-                        className="absolute overflow-hidden rounded-md border p-2 text-left shadow-sm transition hover:z-10 hover:-translate-y-0.5 hover:shadow"
-                        style={{
-                          ...position,
-                          backgroundColor: overlapped ? "#fff4dd" : color.background,
-                          borderColor: overlapped ? "#d38a28" : color.border,
-                          borderLeftColor: overlapped ? "#d38a28" : color.accent,
-                          borderLeftWidth: 4,
-                          boxShadow: isSplit ? "0 8px 18px rgba(23, 32, 27, 0.1)" : undefined,
-                        }}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex min-w-0 items-center gap-2">
-                            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color.accent }} />
-                            <strong className="truncate text-sm">{employee?.name ?? "직원 없음"}</strong>
-                          </div>
-                          <div className="flex shrink-0 items-center gap-1">
-                            {overlapped && <AlertTriangle size={16} className="text-amber" />}
-                          </div>
-                        </div>
-                        <div className="mt-1 space-y-0.5 text-xs text-stone-600">
-                          <p className="flex items-center gap-1 whitespace-nowrap">
-                            <Clock size={13} />
-                            {shift.startTime} - {shift.endTime}
-                          </p>
-                          <p className="whitespace-nowrap">휴게 {shift.breakMinutes}분</p>
-                          <p className="whitespace-nowrap font-semibold text-ink">실근무 {formatHours(calculateShiftHours(shift))}</p>
-                        </div>
-                        {shift.note && (
-                          <p className="mt-2 rounded bg-white/70 px-2 py-1 text-xs text-stone-700">{shift.note}</p>
-                        )}
-                        {overlapped && <p className="mt-2 text-xs font-medium text-amber">시간 겹침</p>}
-                      </button>
-                    );
-                  })}
+                <div className="mt-2 space-y-1 text-sm text-stone-600">
+                  <p className="flex items-center gap-1 whitespace-nowrap">
+                    <Clock size={14} />
+                    {shift.startTime} - {shift.endTime}
+                  </p>
+                  <p className="whitespace-nowrap">휴게 {shift.breakMinutes}분</p>
+                  <p className="whitespace-nowrap font-semibold text-ink">실근무 {formatHours(calculateShiftHours(shift))}</p>
                 </div>
-              </section>
+                {shift.note && (
+                  <p className="mt-2 rounded bg-white/70 px-2 py-1 text-xs text-stone-700">{shift.note}</p>
+                )}
+                {overlapped && <p className="mt-2 text-xs font-medium text-amber">시간 겹침</p>}
+              </button>
             );
           })}
         </div>
-      </div>
+      </section>
 
       {editingShift && (
         <ShiftModal
@@ -1010,11 +1023,6 @@ function buildPositionedShifts(dayShifts: Shift[]): PositionedShift[] {
   }
 
   return positioned;
-}
-
-function getScheduleDayWidth(positionedShifts: PositionedShift[]): number {
-  const maxLaneCount = positionedShifts.reduce((max, item) => Math.max(max, item.laneCount), 1);
-  return Math.max(BASE_DAY_COLUMN_WIDTH, maxLaneCount * SHIFT_LANE_WIDTH);
 }
 
 function getShiftPositionStyle(shift: Shift, lane: number, laneCount: number): React.CSSProperties {
