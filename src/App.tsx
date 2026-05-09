@@ -653,50 +653,57 @@ function ScheduleView({
   const selectedDayHours = selectedDayShifts.reduce((total, shift) => total + calculateShiftHours(shift), 0);
 
   return (
-    <Panel title="근무표 관리" actionLabel="근무 추가" onAction={() => openAddModal()}>
-      <div className="grid grid-cols-7 gap-3">
-        {weekdays.map((day) => {
-          const dayShifts = shifts.filter((shift) => shift.weekday === day.key);
-          const dayHours = dayShifts.reduce((total, shift) => total + calculateShiftHours(shift), 0);
-          const isSelected = day.key === selectedWeekday;
+    <Panel title="근무표 관리" actionLabel="근무 추가" onAction={() => openAddModal(selectedWeekday)}>
+      <div className="rounded-md border border-line bg-white p-2">
+        <div className="grid grid-cols-7 gap-1">
+          {weekdays.map((day) => {
+            const dayShifts = shifts.filter((shift) => shift.weekday === day.key);
+            const dayHours = dayShifts.reduce((total, shift) => total + calculateShiftHours(shift), 0);
+            const isSelected = day.key === selectedWeekday;
 
-          return (
-            <button
-              key={day.key}
-              type="button"
-              onClick={() => setSelectedWeekday(day.key)}
-              className={`rounded-md border px-4 py-3 text-left transition ${
-                isSelected ? "border-moss bg-mint text-moss shadow-sm" : "border-line bg-white hover:border-moss"
-              }`}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <h4 className="font-semibold">{day.label}</h4>
-                <span className={`rounded px-2 py-1 text-xs font-semibold ${isSelected ? "bg-white text-moss" : "bg-stone-100 text-stone-600"}`}>
-                  {dayShifts.length}건
-                </span>
-              </div>
-              <p className="mt-2 text-sm text-stone-600">{formatHours(dayHours)}</p>
-            </button>
-          );
-        })}
+            return (
+              <button
+                key={day.key}
+                type="button"
+                onClick={() => setSelectedWeekday(day.key)}
+                className={`rounded px-3 py-2.5 text-center transition ${
+                  isSelected ? "bg-moss text-white shadow-sm" : "text-stone-600 hover:bg-stone-100"
+                }`}
+              >
+                <div className="font-semibold">{day.label}</div>
+                <div className={`mt-1 text-xs ${isSelected ? "text-white/85" : "text-stone-500"}`}>
+                  {dayShifts.length}건 · {formatHours(dayHours)}
+                </div>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <section className="rounded-md border border-line bg-white">
-        <div className="border-b border-line bg-stone-50 px-4 py-3">
+        <div className="border-b border-line bg-stone-50 px-5 py-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h4 className="text-lg font-bold">{selectedDay.label} 상세 근무표</h4>
-              <p className="mt-1 text-sm text-stone-500">
-                {selectedDayShifts.length}건 · {formatHours(selectedDayHours)}
-              </p>
+              <p className="text-sm font-medium text-stone-500">선택 요일</p>
+              <h4 className="mt-1 text-2xl font-bold">{selectedDay.label}</h4>
             </div>
-            <button
-              onClick={() => openAddModal(selectedWeekday)}
-              className="grid h-9 w-9 place-items-center rounded-md border border-line bg-white text-moss hover:border-moss"
-              aria-label={`${selectedDay.label} 근무 추가`}
-            >
-              <Plus size={16} />
-            </button>
+            <div className="flex items-center gap-3">
+              <div className="rounded-md border border-line bg-white px-4 py-2 text-right">
+                <p className="text-xs text-stone-500">근무 건수</p>
+                <p className="mt-1 font-bold">{selectedDayShifts.length}건</p>
+              </div>
+              <div className="rounded-md border border-line bg-white px-4 py-2 text-right">
+                <p className="text-xs text-stone-500">총 근무시간</p>
+                <p className="mt-1 font-bold">{formatHours(selectedDayHours)}</p>
+              </div>
+              <button
+                onClick={() => openAddModal(selectedWeekday)}
+                className="grid h-9 w-9 place-items-center rounded-md border border-line bg-white text-moss hover:border-moss"
+                aria-label={`${selectedDay.label} 근무 추가`}
+              >
+                <Plus size={16} />
+              </button>
+            </div>
           </div>
         </div>
         <div className="relative h-[720px] overflow-hidden p-3">
