@@ -66,6 +66,8 @@ const normalizeEmployee = (employee: Employee): Employee => ({
   color: employee.color || getEmployeePastelColor(employee.id).accent,
 });
 
+const isTouchDevice = typeof navigator !== "undefined" && navigator.maxTouchPoints > 0;
+
 function App() {
   const [activeView, setActiveView] = useState<ViewId>("dashboard");
   const [dashboardPeriod, setDashboardPeriod] = useState<DashboardPeriod>("weekly");
@@ -164,7 +166,6 @@ function App() {
                       {APP_VERSION}
                     </span>
                   </div>
-                  <p className="mt-1 text-sm text-stone-500">{settings.baseWeekLabel}</p>
                   <h2 className="text-2xl font-bold">{settings.storeName}</h2>
                 </div>
               </div>
@@ -331,7 +332,43 @@ function downloadTextFile(filename: string, content: string, type: string) {
 }
 
 function saveCurrentViewAsPdf() {
-  window.print();
+  const printWindow = window.open("", "_blank", "noopener,noreferrer");
+  if (!printWindow) {
+    window.print();
+    return;
+  }
+
+  const styles = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
+    .map((node) => node.outerHTML)
+    .join("");
+  const html = document.body.innerHTML;
+
+  printWindow.document.open();
+  printWindow.document.write(`<!doctype html>
+    <html lang="ko">
+      <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Cafe Manager</title>
+        ${styles}
+        <style>
+          body {
+            margin: 0;
+            background: #fff;
+          }
+          .no-print {
+            display: none !important;
+          }
+        </style>
+      </head>
+      <body>${html}</body>
+    </html>`);
+  printWindow.document.close();
+  printWindow.focus();
+  window.setTimeout(() => {
+    printWindow.print();
+    printWindow.close();
+  }, 300);
 }
 
 function Dashboard({
@@ -986,9 +1023,14 @@ function ScheduleView({
                               />
                               <div className="min-w-0 flex-1">
                                 <strong
-                                  className={`block truncate font-bold leading-tight text-ink ${
-                                    isUltraCompact ? "text-[6px]" : "text-[11px]"
-                                  }`}
+                                  className={`font-bold leading-tight text-ink ${
+                                    isUltraCompact ? "text-[6px]" : "block truncate text-[11px]"
+                                  } ${isUltraCompact && isTouchDevice ? "block whitespace-normal" : ""}`}
+                                  style={
+                                    isUltraCompact && isTouchDevice
+                                      ? { writingMode: "vertical-rl", textOrientation: "upright" }
+                                      : undefined
+                                  }
                                 >
                                   {employee?.name ?? "직원 없음"}
                                 </strong>
