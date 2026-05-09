@@ -51,6 +51,8 @@ const emptyShift = (employeeId: string, weekday: Weekday): Shift => ({
 const SCHEDULE_START_MINUTES = 7 * 60;
 const SCHEDULE_END_MINUTES = 23 * 60;
 const SCHEDULE_RANGE_MINUTES = SCHEDULE_END_MINUTES - SCHEDULE_START_MINUTES;
+const BASE_DAY_COLUMN_WIDTH = 360;
+const SHIFT_LANE_WIDTH = 188;
 const scheduleHourMarks = Array.from({ length: 9 }, (_, index) => 7 + index * 2);
 
 const normalizeSettings = (settings: StoreSettings): StoreSettings => ({
@@ -648,16 +650,21 @@ function ScheduleView({
   return (
     <Panel title="근무표 관리" actionLabel="근무 추가" onAction={() => openAddModal()}>
       <div className="overflow-x-auto">
-        <div className="grid min-w-[1080px] grid-cols-7 gap-3">
+        <div className="flex min-w-max gap-3">
           {weekdays.map((day) => {
             const dayShifts = shifts
               .filter((shift) => shift.weekday === day.key)
               .sort((a, b) => a.startTime.localeCompare(b.startTime));
             const positionedShifts = buildPositionedShifts(dayShifts);
+            const dayWidth = getScheduleDayWidth(positionedShifts);
             const dayHours = dayShifts.reduce((total, shift) => total + calculateShiftHours(shift), 0);
 
             return (
-              <section key={day.key} className="min-h-[520px] rounded-md border border-line bg-white">
+              <section
+                key={day.key}
+                className="min-h-[520px] shrink-0 rounded-md border border-line bg-white"
+                style={{ width: dayWidth }}
+              >
                 <div className="border-b border-line bg-stone-50 px-3 py-3">
                   <div className="flex items-center justify-between gap-2">
                     <div>
@@ -701,7 +708,7 @@ function ScheduleView({
                       <button
                         key={shift.id}
                         onClick={() => openEditModal(shift)}
-                        className="absolute rounded-md border p-2 text-left shadow-sm transition hover:z-10 hover:-translate-y-0.5 hover:shadow"
+                        className="absolute overflow-hidden rounded-md border p-2 text-left shadow-sm transition hover:z-10 hover:-translate-y-0.5 hover:shadow"
                         style={{
                           ...position,
                           backgroundColor: overlapped ? "#fff4dd" : color.background,
@@ -721,14 +728,14 @@ function ScheduleView({
                           </div>
                         </div>
                         <div className="mt-1 space-y-0.5 text-xs text-stone-600">
-                          <p className="flex items-center gap-1">
+                          <p className="flex items-center gap-1 whitespace-nowrap">
                             <Clock size={13} />
                             {shift.startTime} - {shift.endTime}
                           </p>
-                          {laneCount === 1 && <p>휴게 {shift.breakMinutes}분</p>}
-                          <p className="font-semibold text-ink">실근무 {formatHours(calculateShiftHours(shift))}</p>
+                          <p className="whitespace-nowrap">휴게 {shift.breakMinutes}분</p>
+                          <p className="whitespace-nowrap font-semibold text-ink">실근무 {formatHours(calculateShiftHours(shift))}</p>
                         </div>
-                        {shift.note && laneCount === 1 && (
+                        {shift.note && (
                           <p className="mt-2 rounded bg-white/70 px-2 py-1 text-xs text-stone-700">{shift.note}</p>
                         )}
                         {overlapped && <p className="mt-2 text-xs font-medium text-amber">시간 겹침</p>}
@@ -1003,6 +1010,11 @@ function buildPositionedShifts(dayShifts: Shift[]): PositionedShift[] {
   }
 
   return positioned;
+}
+
+function getScheduleDayWidth(positionedShifts: PositionedShift[]): number {
+  const maxLaneCount = positionedShifts.reduce((max, item) => Math.max(max, item.laneCount), 1);
+  return Math.max(BASE_DAY_COLUMN_WIDTH, maxLaneCount * SHIFT_LANE_WIDTH);
 }
 
 function getShiftPositionStyle(shift: Shift, lane: number, laneCount: number): React.CSSProperties {
