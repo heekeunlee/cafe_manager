@@ -872,6 +872,8 @@ function ScheduleView({
                     const isSplit = laneCount > 1;
                     const isCompact = isSplit || overlapped;
                     const position = getShiftPositionStyle(shift, lane, laneCount);
+                    const compactHours = formatCompactHours(calculateShiftHours(shift));
+                    const compactNote = shift.note?.trim();
 
                     return (
                       <button
@@ -891,24 +893,32 @@ function ScheduleView({
                         }}
                       >
                         {isCompact ? (
-                          <div className="flex h-full gap-1.5">
-                            <div className="flex shrink-0 flex-col items-center gap-1">
-                              <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color.accent }} />
-                              <strong
-                                className="text-[11px] font-bold leading-none text-ink"
-                                style={{ writingMode: "vertical-rl", textOrientation: "upright" }}
-                              >
-                                {employee?.name ?? "직원 없음"}
-                              </strong>
+                          <div className="flex h-full min-h-0 flex-col gap-0.5 overflow-hidden">
+                            <div className="flex items-start gap-1.5">
+                              <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color.accent }} />
+                              <div className="min-w-0 flex-1">
+                                <strong className="block truncate text-[11px] font-bold leading-tight text-ink">
+                                  {employee?.name ?? "직원 없음"}
+                                </strong>
+                                <p className="truncate text-[10px] leading-tight text-stone-600">
+                                  {shift.startTime}-{shift.endTime}
+                                </p>
+                              </div>
+                              {overlapped && <AlertTriangle size={12} className="mt-0.5 shrink-0 text-amber" />}
                             </div>
-                            <div className="min-w-0 space-y-0.5">
-                              <p className="truncate text-[11px] leading-tight text-stone-600">
-                                {formatShortTime(shift.startTime)}-{formatShortTime(shift.endTime)}
+                            <div className="space-y-0.5 text-[10px] leading-tight text-stone-700">
+                              <p className="truncate">
+                                실근무 <span className="font-semibold text-ink">{compactHours}</span>
                               </p>
-                              <p className="truncate text-[11px] font-semibold leading-tight text-ink">
-                                {formatCompactHours(calculateShiftHours(shift))}
+                              <p className="truncate">
+                                휴게 {shift.breakMinutes}분
                               </p>
-                              {overlapped && <AlertTriangle size={13} className="text-amber" />}
+                              <p className="truncate">
+                                메모{" "}
+                                <span className={`font-medium ${compactNote ? "text-ink" : "text-stone-400"}`}>
+                                  {compactNote || "-"}
+                                </span>
+                              </p>
                             </div>
                           </div>
                         ) : (
@@ -1234,8 +1244,13 @@ function getShiftPositionStyle(shift: Shift, lane: number, laneCount: number): R
 }
 
 function PayrollView({ payroll, employees }: { payroll: ReturnType<typeof calculatePayroll>; employees: Employee[] }) {
+  const monthlySettlementRows = buildMonthlySettlementRows(payroll, employees);
+  const monthlySettlementTotal = payroll.reduce((total, item) => total + item.estimatedMonthlyPay, 0);
   const exportPayrollCsv = () => {
     exportRowsAsCsv("cafe-payroll.csv", buildPayrollRows(payroll, employees));
+  };
+  const exportMonthlySettlementCsv = () => {
+    exportRowsAsCsv("monthly-settlement.csv", buildMonthlySettlementCsvRows(monthlySettlementRows));
   };
 
   return (
@@ -1243,9 +1258,52 @@ function PayrollView({ payroll, employees }: { payroll: ReturnType<typeof calcul
       title="급여 계산"
       actions={[
         { label: "CSV 내려받기", onClick: exportPayrollCsv, variant: "secondary" },
+        { label: "월말 정산 CSV", onClick: exportMonthlySettlementCsv, variant: "secondary" },
         { label: "PDF 저장", onClick: saveCurrentViewAsPdf, variant: "secondary" },
       ]}
     >
+      <div className="rounded-md border border-moss/20 bg-mint/30 p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h4 className="text-lg font-bold text-ink">월말 정산 요약</h4>
+            <p className="mt-1 text-sm text-stone-600">
+              직원 또는 근무표를 수정하면 주간, 월간 정산이 즉시 다시 계산됩니다. 월말 입금 예정액은 아래 정산표를 기준으로 확인하면 됩니다.
+            </p>
+          </div>
+          <div className="rounded-md border border-line bg-white px-4 py-3 text-right">
+            <p className="text-xs text-stone-500">이번 달 입금 총액</p>
+            <p className="mt-1 text-xl font-bold text-moss">{formatCurrency(monthlySettlementTotal)}</p>
+          </div>
+        </div>
+      </div>
+      <div className="mt-4 overflow-x-auto rounded-md border border-line bg-white">
+        <table className="min-w-[920px] w-full text-left text-sm">
+          <thead className="bg-stone-50 text-stone-600">
+            <tr>
+              <th className="px-4 py-3">직원명</th>
+              <th className="px-4 py-3">주간 근무시간</th>
+              <th className="px-4 py-3">주간 급여</th>
+              <th className="px-4 py-3">월 예상 급여</th>
+              <th className="px-4 py-3">입금 예정액</th>
+              <th className="px-4 py-3">정산 상태</th>
+            </tr>
+          </thead>
+          <tbody>
+            {monthlySettlementRows.map((item) => (
+              <tr key={item.employeeId} className="border-t border-line">
+                <td className="px-4 py-3 font-semibold">{item.employeeName}</td>
+                <td className="px-4 py-3">{formatHours(item.weeklyHours)}</td>
+                <td className="px-4 py-3">{formatCurrency(item.weeklyTotalPay)}</td>
+                <td className="px-4 py-3">{formatCurrency(item.estimatedMonthlyPay)}</td>
+                <td className="px-4 py-3 font-bold">{formatCurrency(item.depositAmount)}</td>
+                <td className="px-4 py-3">
+                  <span className="rounded px-2 py-1 text-xs font-semibold bg-mint text-moss">월말 정산 대상</span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       <PayrollTable payroll={payroll} employees={employees} showDetails />
     </Panel>
   );
@@ -1270,6 +1328,42 @@ function buildPayrollRows(payroll: ReturnType<typeof calculatePayroll>, employee
         item.qualifiesForWeeklyHolidayPay ? "발생" : "미발생",
       ];
     }),
+  ];
+}
+
+function buildMonthlySettlementRows(payroll: ReturnType<typeof calculatePayroll>, employees: Employee[]) {
+  return payroll.map((item) => {
+    const employee = employees.find((target) => target.id === item.employeeId);
+    return {
+      employeeId: item.employeeId,
+      employeeName: employee?.name ?? "",
+      weeklyHours: item.weeklyHours,
+      weeklyTotalPay: item.weeklyTotalPay,
+      estimatedMonthlyPay: item.estimatedMonthlyPay,
+      depositAmount: Math.round(item.estimatedMonthlyPay),
+    };
+  });
+}
+
+function buildMonthlySettlementCsvRows(
+  rows: Array<{
+    employeeId: string;
+    employeeName: string;
+    weeklyHours: number;
+    weeklyTotalPay: number;
+    estimatedMonthlyPay: number;
+    depositAmount: number;
+  }>,
+) {
+  return [
+    ["직원명", "주간근무시간", "주간총급여", "월예상급여", "입금예정액"],
+    ...rows.map((row) => [
+      row.employeeName,
+      row.weeklyHours.toFixed(2),
+      Math.round(row.weeklyTotalPay),
+      Math.round(row.estimatedMonthlyPay),
+      row.depositAmount,
+    ]),
   ];
 }
 
