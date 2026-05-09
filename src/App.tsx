@@ -29,7 +29,7 @@ import {
 
 type ViewId = "dashboard" | "employees" | "schedule" | "payroll" | "settings";
 
-const APP_VERSION = "v1.3";
+const APP_VERSION = __APP_VERSION__;
 
 const navItems: Array<{ id: ViewId; label: string; icon: typeof LayoutDashboard }> = [
   { id: "dashboard", label: "대시보드", icon: LayoutDashboard },
@@ -153,7 +153,7 @@ function App() {
               </div>
             </div>
           </div>
-          <nav className="border-t border-line px-6">
+          <nav className="no-print border-t border-line px-6">
             <div className="flex gap-1">
               {navItems.map((item) => {
                 const Icon = item.icon;
@@ -226,6 +226,31 @@ function StatusPill({ saved }: { saved: boolean }) {
   );
 }
 
+type ExportAction = {
+  label: string;
+  onClick: () => void;
+  variant?: "primary" | "secondary";
+};
+
+function exportRowsAsCsv(filename: string, rows: Array<Array<string | number>>) {
+  const csv = rows.map((row) => row.map((value) => escapeCsvValue(String(value))).join(",")).join("\n");
+  downloadTextFile(filename, `\uFEFF${csv}`, "text/csv;charset=utf-8");
+}
+
+function downloadTextFile(filename: string, content: string, type: string) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function saveCurrentViewAsPdf() {
+  window.print();
+}
+
 function Dashboard({
   payroll,
   employees,
@@ -243,8 +268,28 @@ function Dashboard({
   nearThreshold: ReturnType<typeof calculatePayroll>;
   weeklyWorkingEmployeeCount: number;
 }) {
+  const exportDashboardCsv = () => {
+    const payrollRows = buildPayrollRows(payroll, employees);
+    exportRowsAsCsv("dashboard-summary.csv", [
+      ["항목", "값"],
+      ["이번 주 총 근무시간", formatHours(totalWeeklyHours)],
+      ["이번 달 예상 인건비", formatCurrency(monthlyLaborCost)],
+      ["주휴수당 적용 직원", `${weeklyHolidayEnabledCount}명`],
+      ["주 15시간 근접 직원", `${nearThreshold.length}명`],
+      ["이번 주 총 근무 인원", `${weeklyWorkingEmployeeCount}명`],
+      [],
+      ...payrollRows,
+    ]);
+  };
+
   return (
-    <>
+    <Panel
+      title="대시보드"
+      actions={[
+        { label: "CSV 내려받기", onClick: exportDashboardCsv, variant: "secondary" },
+        { label: "PDF 저장", onClick: saveCurrentViewAsPdf, variant: "secondary" },
+      ]}
+    >
       <div className="grid grid-cols-5 gap-4">
         <MetricCard title="이번 주 총 근무시간" value={formatHours(totalWeeklyHours)} icon={ClipboardList} />
         <MetricCard title="이번 달 예상 인건비" value={formatCurrency(monthlyLaborCost)} icon={WalletCards} />
@@ -272,7 +317,7 @@ function Dashboard({
       )}
 
       <DashboardPayrollTable payroll={payroll} employees={employees} />
-    </>
+    </Panel>
   );
 }
 
@@ -409,8 +454,20 @@ function EmployeesView({
     closeModal();
   };
 
+  const exportEmployeesCsv = () => {
+    exportRowsAsCsv("employees.csv", buildEmployeeRows(employees));
+  };
+
   return (
-    <Panel title="직원 관리" actionLabel="직원 추가" onAction={openAddModal}>
+    <Panel
+      title="직원 관리"
+      actionLabel="직원 추가"
+      onAction={openAddModal}
+      actions={[
+        { label: "CSV 내려받기", onClick: exportEmployeesCsv, variant: "secondary" },
+        { label: "PDF 저장", onClick: saveCurrentViewAsPdf, variant: "secondary" },
+      ]}
+    >
       <div className="overflow-x-auto rounded-md border border-line bg-white">
         <table className="min-w-[1040px] w-full text-left text-sm">
           <thead className="bg-stone-50 text-stone-600">
@@ -649,9 +706,20 @@ function ScheduleView({
   };
 
   const hasOverlap = (shift: Shift) => findOverlappingShifts(shift, shifts).length > 0;
+  const exportScheduleCsv = () => {
+    exportRowsAsCsv("weekly-schedule.csv", buildShiftRows(shifts, employees));
+  };
 
   return (
-    <Panel title="근무표 관리" actionLabel="근무 추가" onAction={() => openAddModal()}>
+    <Panel
+      title="근무표 관리"
+      actionLabel="근무 추가"
+      onAction={() => openAddModal()}
+      actions={[
+        { label: "CSV 내려받기", onClick: exportScheduleCsv, variant: "secondary" },
+        { label: "PDF 저장", onClick: saveCurrentViewAsPdf, variant: "secondary" },
+      ]}
+    >
       <div className="overflow-x-auto">
         <div className="grid min-w-[1080px] grid-cols-7 gap-3">
           {weekdays.map((day) => {
@@ -1065,33 +1133,17 @@ function getShiftPositionStyle(shift: Shift, lane: number, laneCount: number): R
 
 function PayrollView({ payroll, employees }: { payroll: ReturnType<typeof calculatePayroll>; employees: Employee[] }) {
   const exportPayrollCsv = () => {
-    const rows = [
-      ["직원명", "주근무시간", "기본주급", "주휴시간", "주휴수당", "월예상급여", "주휴발생여부"],
-      ...payroll.map((item) => {
-        const employee = employees.find((target) => target.id === item.employeeId);
-        return [
-          employee?.name ?? "",
-          item.weeklyHours.toFixed(2),
-          Math.round(item.baseWeeklyPay).toString(),
-          item.weeklyHolidayHours.toFixed(2),
-          Math.round(item.weeklyHolidayPay).toString(),
-          Math.round(item.estimatedMonthlyPay).toString(),
-          item.qualifiesForWeeklyHolidayPay ? "발생" : "미발생",
-        ];
-      }),
-    ];
-    const csv = rows.map((row) => row.map(escapeCsvValue).join(",")).join("\n");
-    const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "cafe-payroll.csv";
-    link.click();
-    URL.revokeObjectURL(url);
+    exportRowsAsCsv("cafe-payroll.csv", buildPayrollRows(payroll, employees));
   };
 
   return (
-    <Panel title="급여 계산" actionLabel="CSV 내보내기" onAction={exportPayrollCsv}>
+    <Panel
+      title="급여 계산"
+      actions={[
+        { label: "CSV 내려받기", onClick: exportPayrollCsv, variant: "secondary" },
+        { label: "PDF 저장", onClick: saveCurrentViewAsPdf, variant: "secondary" },
+      ]}
+    >
       <PayrollTable payroll={payroll} employees={employees} showDetails />
     </Panel>
   );
@@ -1099,6 +1151,74 @@ function PayrollView({ payroll, employees }: { payroll: ReturnType<typeof calcul
 
 function escapeCsvValue(value: string): string {
   return `"${value.replace(/"/g, "\"\"")}"`;
+}
+
+function buildPayrollRows(payroll: ReturnType<typeof calculatePayroll>, employees: Employee[]) {
+  return [
+    ["직원명", "주근무시간", "기본주급", "주휴시간", "주휴수당", "월예상급여", "주휴발생여부"],
+    ...payroll.map((item) => {
+      const employee = employees.find((target) => target.id === item.employeeId);
+      return [
+        employee?.name ?? "",
+        item.weeklyHours.toFixed(2),
+        Math.round(item.baseWeeklyPay),
+        item.weeklyHolidayHours.toFixed(2),
+        Math.round(item.weeklyHolidayPay),
+        Math.round(item.estimatedMonthlyPay),
+        item.qualifiesForWeeklyHolidayPay ? "발생" : "미발생",
+      ];
+    }),
+  ];
+}
+
+function buildEmployeeRows(employees: Employee[]) {
+  return [
+    ["이름", "직책/메모", "시급", "주휴수당", "입사일", "퇴사일", "상태", "색상"],
+    ...employees.map((employee) => [
+      employee.name,
+      employee.roleNote,
+      employee.hourlyWage,
+      employee.weeklyHolidayPayEnabled ? "적용" : "미적용",
+      employee.startDate,
+      employee.endDate || "",
+      employee.status === "active" ? "재직" : "퇴사",
+      employee.color ?? "",
+    ]),
+  ];
+}
+
+function buildShiftRows(shifts: Shift[], employees: Employee[]) {
+  return [
+    ["요일", "직원명", "시작시간", "종료시간", "휴게시간(분)", "실근무시간", "반복근무", "메모"],
+    ...shifts
+      .slice()
+      .sort((a, b) => `${a.weekday}-${a.startTime}`.localeCompare(`${b.weekday}-${b.startTime}`))
+      .map((shift) => {
+        const employee = employees.find((target) => target.id === shift.employeeId);
+        const weekday = weekdays.find((day) => day.key === shift.weekday);
+        return [
+          weekday?.label ?? shift.weekday,
+          employee?.name ?? "직원 없음",
+          shift.startTime,
+          shift.endTime,
+          shift.breakMinutes,
+          calculateShiftHours(shift).toFixed(2),
+          shift.repeatsWeekly ? "예" : "아니오",
+          shift.note ?? "",
+        ];
+      }),
+  ];
+}
+
+function buildSettingsRows(settings: StoreSettings) {
+  return [
+    ["항목", "값"],
+    ["매장명", settings.storeName],
+    ["기준 주차", settings.baseWeekLabel],
+    ["기준 시급", settings.defaultHourlyWage],
+    ["월 환산 계수", settings.monthlyWeekMultiplier],
+    ["주휴수당 계산 방식", settings.weeklyHolidayCalculation],
+  ];
 }
 
 function PayrollTable({
@@ -1166,8 +1286,18 @@ function SettingsView({
     onSave({ ...settings, ...patch });
   };
 
+  const exportSettingsCsv = () => {
+    exportRowsAsCsv("store-settings.csv", buildSettingsRows(settings));
+  };
+
   return (
-    <Panel title="설정">
+    <Panel
+      title="설정"
+      actions={[
+        { label: "CSV 내려받기", onClick: exportSettingsCsv, variant: "secondary" },
+        { label: "PDF 저장", onClick: saveCurrentViewAsPdf, variant: "secondary" },
+      ]}
+    >
       <div className="grid grid-cols-2 gap-4 rounded-md border border-line bg-white p-4">
         <Field label="매장명">
           <input value={settings.storeName} onChange={(event) => updateSettings({ storeName: event.target.value })} />
@@ -1222,22 +1352,39 @@ function Panel({
   title,
   actionLabel,
   onAction,
+  actions = [],
   children,
 }: {
   title: string;
   actionLabel?: string;
   onAction?: () => void;
+  actions?: ExportAction[];
   children: React.ReactNode;
 }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className="text-xl font-bold">{title}</h3>
-        {actionLabel && (
-          <button onClick={onAction} className="rounded-md bg-moss px-4 py-2 text-sm font-semibold text-white">
-            {actionLabel}
-          </button>
-        )}
+        <div className="no-print flex flex-wrap items-center justify-end gap-2">
+          {actions.map((action) => (
+            <button
+              key={action.label}
+              onClick={action.onClick}
+              className={`rounded-md px-4 py-2 text-sm font-semibold ${
+                action.variant === "primary"
+                  ? "bg-moss text-white"
+                  : "border border-line bg-white text-stone-700 hover:border-moss hover:text-moss"
+              }`}
+            >
+              {action.label}
+            </button>
+          ))}
+          {actionLabel && (
+            <button onClick={onAction} className="rounded-md bg-moss px-4 py-2 text-sm font-semibold text-white">
+              {actionLabel}
+            </button>
+          )}
+        </div>
       </div>
       {children}
     </div>

@@ -44,3 +44,14 @@ input[type="checkbox"] {
 button {
   cursor: pointer;
 }
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    overflow: visible;
+    background: #fff;
+  }
+}
