@@ -8,7 +8,6 @@ import {
   Pencil,
   Plus,
   LayoutDashboard,
-  Menu,
   Settings,
   Trash2,
   X,
@@ -127,9 +126,9 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-paper text-ink">
+    <div className="min-h-screen min-w-[1200px] bg-paper text-ink">
       <div className="flex min-h-screen">
-        <aside className="hidden w-64 border-r border-line bg-white px-4 py-5 lg:block">
+        <aside className="w-64 shrink-0 border-r border-line bg-white px-4 py-5">
           <div className="mb-8 flex items-center gap-3 px-2">
             <div className="grid h-10 w-10 place-items-center rounded-md bg-moss text-white">
               <Coffee size={22} />
@@ -159,37 +158,21 @@ function App() {
         </aside>
 
         <main className="flex min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-10 border-b border-line bg-white/95 px-4 py-4 backdrop-blur md:px-6">
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <header className="sticky top-0 z-10 border-b border-line bg-white/95 px-6 py-4 backdrop-blur">
+            <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <button className="grid h-10 w-10 place-items-center rounded-md border border-line lg:hidden">
-                  <Menu size={20} />
-                </button>
                 <div>
                   <p className="text-sm text-stone-500">{settings.baseWeekLabel}</p>
-                  <h2 className="text-xl font-bold md:text-2xl">{settings.storeName}</h2>
+                  <h2 className="text-2xl font-bold">{settings.storeName}</h2>
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <StatusPill saved={saved} />
-                <div className="flex rounded-md border border-line bg-paper p-1 lg:hidden">
-                  {navItems.slice(0, 4).map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => setActiveView(item.id)}
-                      className={`rounded px-2 py-1 text-xs font-medium ${
-                        activeView === item.id ? "bg-moss text-white" : "text-stone-600"
-                      }`}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
               </div>
             </div>
           </header>
 
-          <section className="space-y-6 p-4 md:p-6">
+          <section className="space-y-6 p-6">
             {activeView === "dashboard" && (
               <Dashboard
                 payroll={payroll}
@@ -257,7 +240,7 @@ function Dashboard({
 }) {
   return (
     <>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid grid-cols-5 gap-4">
         <MetricCard title="이번 주 총 근무시간" value={formatHours(totalWeeklyHours)} icon={ClipboardList} />
         <MetricCard title="이번 달 예상 인건비" value={formatCurrency(monthlyLaborCost)} icon={WalletCards} />
         <MetricCard title="주휴수당 적용 직원" value={`${weeklyHolidayEnabledCount}명`} icon={Users} />
@@ -535,15 +518,16 @@ function EmployeeModal({
   };
 
   return (
-    <div className="fixed inset-0 z-30 grid place-items-center bg-black/35 p-4">
-      <form onSubmit={handleSubmit} className="w-full max-w-lg rounded-md bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-line px-5 py-4">
-          <h4 className="text-lg font-bold">{employee.name ? "직원 수정" : "직원 추가"}</h4>
-          <button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center rounded-md hover:bg-stone-100">
-            <X size={18} />
-          </button>
-        </div>
-        <div className="grid gap-4 p-5 sm:grid-cols-2">
+    <div className="fixed inset-0 z-30 overflow-auto bg-black/35 p-6">
+      <div className="grid min-h-full min-w-[1200px] place-items-center">
+        <form onSubmit={handleSubmit} className="w-[32rem] rounded-md bg-white shadow-xl">
+          <div className="flex items-center justify-between border-b border-line px-5 py-4">
+            <h4 className="text-lg font-bold">{employee.name ? "직원 수정" : "직원 추가"}</h4>
+            <button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center rounded-md hover:bg-stone-100">
+              <X size={18} />
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-4 p-5">
           <Field label="이름">
             <input
               value={draft.name}
@@ -596,7 +580,7 @@ function EmployeeModal({
               <option value="inactive">퇴사</option>
             </select>
           </Field>
-          <label className="flex items-center gap-2 text-sm sm:col-span-2">
+          <label className="col-span-2 flex items-center gap-2 text-sm">
             <input
               type="checkbox"
               checked={draft.weeklyHolidayPayEnabled}
@@ -612,16 +596,17 @@ function EmployeeModal({
             />
           </Field>
         </div>
-        <div className="flex justify-end gap-2 border-t border-line px-5 py-4">
-          <button type="button" onClick={onClose} className="rounded-md border border-line px-4 py-2 text-sm font-semibold">
-            취소
-          </button>
-          <button type="submit" className="inline-flex items-center gap-2 rounded-md bg-moss px-4 py-2 text-sm font-semibold text-white">
-            <Plus size={16} />
-            저장
-          </button>
-        </div>
-      </form>
+          <div className="flex justify-end gap-2 border-t border-line px-5 py-4">
+            <button type="button" onClick={onClose} className="rounded-md border border-line px-4 py-2 text-sm font-semibold">
+              취소
+            </button>
+            <button type="submit" className="inline-flex items-center gap-2 rounded-md bg-moss px-4 py-2 text-sm font-semibold text-white">
+              <Plus size={16} />
+              저장
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
@@ -810,15 +795,16 @@ function ShiftModal({
   };
 
   return (
-    <div className="fixed inset-0 z-30 grid place-items-center bg-black/35 p-4">
-      <form onSubmit={handleSubmit} className="w-full max-w-xl rounded-md bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-line px-5 py-4">
-          <h4 className="text-lg font-bold">{isExisting ? "근무 수정" : "근무 추가"}</h4>
-          <button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center rounded-md hover:bg-stone-100">
-            <X size={18} />
-          </button>
-        </div>
-        <div className="grid gap-4 p-5 sm:grid-cols-2">
+    <div className="fixed inset-0 z-30 overflow-auto bg-black/35 p-6">
+      <div className="grid min-h-full min-w-[1200px] place-items-center">
+        <form onSubmit={handleSubmit} className="w-[36rem] rounded-md bg-white shadow-xl">
+          <div className="flex items-center justify-between border-b border-line px-5 py-4">
+            <h4 className="text-lg font-bold">{isExisting ? "근무 수정" : "근무 추가"}</h4>
+            <button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center rounded-md hover:bg-stone-100">
+              <X size={18} />
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-4 p-5">
           <Field label="직원 선택">
             <select value={draft.employeeId} onChange={(event) => updateDraft({ employeeId: event.target.value })}>
               {employees.map((employee) => (
@@ -857,7 +843,7 @@ function ShiftModal({
             <p className="text-xs text-stone-500">실근무시간</p>
             <p className="mt-1 text-xl font-bold">{formatHours(calculateShiftHours(draft))}</p>
           </div>
-          <label className="flex items-center gap-2 text-sm sm:col-span-2">
+          <label className="col-span-2 flex items-center gap-2 text-sm">
             <input
               type="checkbox"
               checked={draft.repeatsWeekly}
@@ -873,7 +859,7 @@ function ShiftModal({
             />
           </Field>
           {overlappedShifts.length > 0 && (
-            <div className="rounded-md border border-amber/40 bg-amber/10 p-3 text-sm text-stone-800 sm:col-span-2">
+            <div className="col-span-2 rounded-md border border-amber/40 bg-amber/10 p-3 text-sm text-stone-800">
               <div className="flex items-start gap-2">
                 <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber" />
                 <div>
@@ -886,25 +872,26 @@ function ShiftModal({
             </div>
           )}
         </div>
-        <div className="flex flex-wrap justify-between gap-2 border-t border-line px-5 py-4">
-          <div>
-            {isExisting && (
-              <button type="button" onClick={handleDelete} className="rounded-md border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">
-                삭제
+          <div className="flex flex-wrap justify-between gap-2 border-t border-line px-5 py-4">
+            <div>
+              {isExisting && (
+                <button type="button" onClick={handleDelete} className="rounded-md border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">
+                  삭제
+                </button>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <button type="button" onClick={onClose} className="rounded-md border border-line px-4 py-2 text-sm font-semibold">
+                취소
               </button>
-            )}
+              <button type="submit" className="inline-flex items-center gap-2 rounded-md bg-moss px-4 py-2 text-sm font-semibold text-white">
+                <Plus size={16} />
+                저장
+              </button>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <button type="button" onClick={onClose} className="rounded-md border border-line px-4 py-2 text-sm font-semibold">
-              취소
-            </button>
-            <button type="submit" className="inline-flex items-center gap-2 rounded-md bg-moss px-4 py-2 text-sm font-semibold text-white">
-              <Plus size={16} />
-              저장
-            </button>
-          </div>
-        </div>
-      </form>
+        </form>
+      </div>
     </div>
   );
 }
@@ -1139,7 +1126,7 @@ function SettingsView({
 
   return (
     <Panel title="설정">
-      <div className="grid gap-4 rounded-md border border-line bg-white p-4 md:grid-cols-2">
+      <div className="grid grid-cols-2 gap-4 rounded-md border border-line bg-white p-4">
         <Field label="매장명">
           <input value={settings.storeName} onChange={(event) => updateSettings({ storeName: event.target.value })} />
         </Field>
