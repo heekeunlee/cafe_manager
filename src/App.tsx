@@ -96,13 +96,6 @@ function App() {
     const timer = window.setTimeout(() => setSplashGateReady(true), 3000);
     return () => window.clearTimeout(timer);
   }, []);
-  useEffect(() => {
-    if (splashGateReady && splashCode === "0001") {
-      const timer = window.setTimeout(() => setShowSplash(false), 350);
-      return () => window.clearTimeout(timer);
-    }
-    return undefined;
-  }, [splashCode, splashGateReady]);
   const updateEmployee = (id: string, patch: Partial<Employee>) => {
     setEmployees(employees.map((employee) => (employee.id === id ? normalizeEmployee({ ...employee, ...patch }) : employee)));
   };
@@ -155,6 +148,7 @@ function App() {
           onSubmit={() => {
             if (!splashGateReady) return;
             if (splashCode === "0001") {
+              setShowSplash(false);
               setSplashError(false);
               return;
             }
@@ -278,17 +272,17 @@ function SplashScreen({
           }}
         >
           <label className="block text-left text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
-            Access Code
+            Enter access code
           </label>
           <div className="mt-2 flex gap-2">
             <input
+              type="password"
               inputMode="numeric"
               pattern="[0-9]*"
               maxLength={4}
               autoComplete="one-time-code"
               value={code}
               onChange={(event) => onCodeChange(event.target.value.replace(/\D/g, "").slice(0, 4))}
-              placeholder="0001"
               className={`w-full rounded-xl border px-4 py-3 text-center text-lg font-semibold tracking-[0.4em] ${
                 error ? "border-red-300" : "border-line"
               }`}
@@ -305,7 +299,7 @@ function SplashScreen({
             {error ? (
               <p className="font-medium text-red-600">비밀번호가 올바르지 않습니다.</p>
             ) : gateReady ? (
-              <p className="text-stone-500">0001을 입력하면 본 화면이 열립니다.</p>
+              <p className="text-stone-500">비밀번호를 입력하세요.</p>
             ) : (
               <p className="text-stone-400">잠시 후 입력 가능합니다.</p>
             )}
@@ -1003,18 +997,18 @@ function ScheduleView({
                               <div className="min-w-0 flex-1">
                                 <strong
                                   className={`block truncate font-bold leading-tight text-ink ${
-                                    isUltraCompact ? "text-[7px]" : "text-[11px]"
+                                    isUltraCompact ? "text-[6px]" : "text-[11px]"
                                   }`}
                                 >
                                   {employee?.name ?? "직원 없음"}
                                 </strong>
-                                <p className={`truncate leading-tight text-stone-600 ${isUltraCompact ? "text-[6px]" : "text-[10px]"}`}>
+                                <p className={`truncate leading-tight text-stone-600 ${isUltraCompact ? "text-[5px]" : "text-[10px]"}`}>
                                   {shift.startTime}-{shift.endTime}
                                 </p>
                               </div>
-                              {overlapped && <AlertTriangle size={isUltraCompact ? 9 : 12} className="mt-0.5 shrink-0 text-amber" />}
+                              {overlapped && <AlertTriangle size={isUltraCompact ? 8 : 12} className="mt-0.5 shrink-0 text-amber" />}
                             </div>
-                            <div className={`space-y-0.5 leading-tight text-stone-700 ${isUltraCompact ? "text-[6px]" : "text-[10px]"}`}>
+                            <div className={`space-y-0.5 leading-tight text-stone-700 ${isUltraCompact ? "text-[5px]" : "text-[10px]"}`}>
                               <p className="truncate">
                                 실근무 <span className="font-semibold text-ink">{compactHours}</span>
                               </p>
