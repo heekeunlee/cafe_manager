@@ -14,7 +14,7 @@ import {
   Users,
   WalletCards,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { sampleEmployees, sampleSettings, sampleShifts } from "./data/sampleData";
 import { useSupabaseCafeData } from "./hooks/useSupabaseCafeData";
 import type { Employee, EmployeePayroll, Shift, StoreSettings, Weekday } from "./types";
@@ -71,7 +71,6 @@ function App() {
   const [dashboardPeriod, setDashboardPeriod] = useState<DashboardPeriod>("weekly");
   const [showSplash, setShowSplash] = useState(true);
   const [splashCode, setSplashCode] = useState("");
-  const [splashGateReady, setSplashGateReady] = useState(false);
   const [splashError, setSplashError] = useState(false);
   const {
     employees,
@@ -92,10 +91,6 @@ function App() {
   );
   const weeklyHolidayEnabledCount = activeEmployees.filter((employee) => employee.weeklyHolidayPayEnabled).length;
   const nearThreshold = payroll.filter((item) => item.isNearFifteenHours);
-  useEffect(() => {
-    const timer = window.setTimeout(() => setSplashGateReady(true), 3000);
-    return () => window.clearTimeout(timer);
-  }, []);
   const updateEmployee = (id: string, patch: Partial<Employee>) => {
     setEmployees(employees.map((employee) => (employee.id === id ? normalizeEmployee({ ...employee, ...patch }) : employee)));
   };
@@ -139,14 +134,12 @@ function App() {
       {showSplash && (
         <SplashScreen
           code={splashCode}
-          gateReady={splashGateReady}
           error={splashError}
           onCodeChange={(value) => {
             setSplashCode(value);
             setSplashError(false);
           }}
           onSubmit={() => {
-            if (!splashGateReady) return;
             if (splashCode === "0001") {
               setShowSplash(false);
               setSplashError(false);
@@ -246,13 +239,11 @@ function App() {
 
 function SplashScreen({
   code,
-  gateReady,
   error,
   onCodeChange,
   onSubmit,
 }: {
   code: string;
-  gateReady: boolean;
   error: boolean;
   onCodeChange: (value: string) => void;
   onSubmit: () => void;
@@ -281,6 +272,7 @@ function SplashScreen({
               pattern="[0-9]*"
               maxLength={4}
               autoComplete="one-time-code"
+              autoFocus
               value={code}
               onChange={(event) => onCodeChange(event.target.value.replace(/\D/g, "").slice(0, 4))}
               className={`w-full rounded-xl border px-4 py-3 text-center text-lg font-semibold tracking-[0.4em] ${
@@ -298,10 +290,8 @@ function SplashScreen({
           <div className="mt-2 min-h-5 text-sm">
             {error ? (
               <p className="font-medium text-red-600">비밀번호가 올바르지 않습니다.</p>
-            ) : gateReady ? (
-              <p className="text-stone-500">비밀번호를 입력하세요.</p>
             ) : (
-              <p className="text-stone-400">잠시 후 입력 가능합니다.</p>
+              <p className="text-stone-500">비밀번호를 입력한 뒤 엔터를 누르세요.</p>
             )}
           </div>
         </form>
