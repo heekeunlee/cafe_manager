@@ -144,7 +144,7 @@ function App() {
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h1 className="font-semibold">Cafe Manger</h1>
+                    <h1 className="font-semibold">Cafe Manager</h1>
                     <span className="rounded border border-line bg-paper px-1.5 py-0.5 text-[11px] font-semibold text-stone-500">
                       {APP_VERSION}
                     </span>
@@ -224,15 +224,12 @@ function App() {
 
 function SplashScreen() {
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-[radial-gradient(circle_at_top,_rgba(79,141,97,0.14),_rgba(250,247,240,0.98)_55%,_rgba(245,242,235,1)_100%)]">
-      <div className="flex flex-col items-center gap-4 px-6 text-center">
-        <div className="grid h-28 w-28 place-items-center rounded-3xl bg-moss text-white shadow-[0_18px_50px_rgba(79,141,97,0.28)]">
-          <Coffee size={64} strokeWidth={1.8} />
+    <div className="fixed inset-0 z-50 grid place-items-center bg-white">
+      <div className="flex flex-col items-center gap-5 px-6 text-center">
+        <div className="splash-logo grid h-32 w-32 place-items-center rounded-[2rem] bg-moss text-white shadow-[0_24px_55px_rgba(79,141,97,0.24)]">
+          <Coffee size={68} strokeWidth={1.75} />
         </div>
-        <div>
-          <h1 className="text-4xl font-black tracking-tight text-ink">Cafe Manger</h1>
-          <p className="mt-2 text-sm font-medium tracking-[0.2em] text-stone-500">근무 · 급여 · 정산 관리</p>
-        </div>
+        <h1 className="splash-title text-4xl font-black tracking-tight text-ink sm:text-5xl">Cafe Manager</h1>
       </div>
     </div>
   );

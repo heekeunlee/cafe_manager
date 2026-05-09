@@ -55,3 +55,39 @@ button {
     background: #fff;
   }
 }
+
+@keyframes splash-float {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-6px) scale(1.015);
+  }
+}
+
+@keyframes splash-fade {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  15%,
+  85% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+.splash-logo {
+  animation:
+    splash-float 1.8s ease-in-out infinite,
+    splash-fade 3s ease-in-out both;
+}
+
+.splash-title {
+  animation: splash-fade 3s ease-in-out both;
+}
