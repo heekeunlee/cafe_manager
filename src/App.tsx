@@ -17,7 +17,7 @@ import {
 import { useMemo, useState } from "react";
 import { sampleEmployees, sampleSettings, sampleShifts } from "./data/sampleData";
 import { useSupabaseCafeData } from "./hooks/useSupabaseCafeData";
-import type { Employee, Shift, StoreSettings, Weekday } from "./types";
+import type { Employee, EmployeePayroll, Shift, StoreSettings, Weekday } from "./types";
 import {
   calculatePayroll,
   calculateShiftHours,
@@ -28,6 +28,7 @@ import {
 } from "./utils/payroll";
 
 type ViewId = "dashboard" | "employees" | "schedule" | "payroll" | "settings";
+type DashboardPeriod = "weekly" | "monthly";
 
 const APP_VERSION = __APP_VERSION__;
 
@@ -67,6 +68,7 @@ const normalizeEmployee = (employee: Employee): Employee => ({
 
 function App() {
   const [activeView, setActiveView] = useState<ViewId>("dashboard");
+  const [dashboardPeriod, setDashboardPeriod] = useState<DashboardPeriod>("weekly");
   const {
     employees,
     shifts,
@@ -84,11 +86,8 @@ function App() {
     () => calculatePayroll(normalizedEmployees, shifts, settings.monthlyWeekMultiplier),
     [normalizedEmployees, shifts, settings.monthlyWeekMultiplier],
   );
-  const totalWeeklyHours = payroll.reduce((total, item) => total + item.weeklyHours, 0);
-  const monthlyLaborCost = payroll.reduce((total, item) => total + item.estimatedMonthlyPay, 0);
   const weeklyHolidayEnabledCount = activeEmployees.filter((employee) => employee.weeklyHolidayPayEnabled).length;
   const nearThreshold = payroll.filter((item) => item.isNearFifteenHours);
-  const weeklyWorkingEmployeeCount = payroll.filter((item) => item.weeklyHours > 0).length;
   const updateEmployee = (id: string, patch: Partial<Employee>) => {
     setEmployees(employees.map((employee) => (employee.id === id ? normalizeEmployee({ ...employee, ...patch }) : employee)));
   };
@@ -182,11 +181,11 @@ function App() {
               <Dashboard
                 payroll={payroll}
                 employees={normalizedEmployees}
-                totalWeeklyHours={totalWeeklyHours}
-                monthlyLaborCost={monthlyLaborCost}
                 weeklyHolidayEnabledCount={weeklyHolidayEnabledCount}
                 nearThreshold={nearThreshold}
-                weeklyWorkingEmployeeCount={weeklyWorkingEmployeeCount}
+                period={dashboardPeriod}
+                onPeriodChange={setDashboardPeriod}
+                monthlyWeekMultiplier={settings.monthlyWeekMultiplier}
               />
             )}
             {activeView === "employees" && (
@@ -254,32 +253,46 @@ function saveCurrentViewAsPdf() {
 function Dashboard({
   payroll,
   employees,
-  totalWeeklyHours,
-  monthlyLaborCost,
   weeklyHolidayEnabledCount,
   nearThreshold,
-  weeklyWorkingEmployeeCount,
+  period,
+  onPeriodChange,
+  monthlyWeekMultiplier,
 }: {
-  payroll: ReturnType<typeof calculatePayroll>;
+  payroll: EmployeePayroll[];
   employees: Employee[];
-  totalWeeklyHours: number;
-  monthlyLaborCost: number;
   weeklyHolidayEnabledCount: number;
-  nearThreshold: ReturnType<typeof calculatePayroll>;
-  weeklyWorkingEmployeeCount: number;
+  nearThreshold: EmployeePayroll[];
+  period: DashboardPeriod;
+  onPeriodChange: (period: DashboardPeriod) => void;
+  monthlyWeekMultiplier: number;
 }) {
+  const periodLabel = period === "weekly" ? "주간" : "월간";
+  const scale = period === "weekly" ? 1 : monthlyWeekMultiplier;
+  const periodPayroll = payroll.map((item) => ({
+    ...item,
+    displayHours: item.weeklyHours * scale,
+    displayBasePay: item.baseWeeklyPay * scale,
+    displayHolidayPay: item.weeklyHolidayPay * scale,
+    displayTotalPay: item.weeklyTotalPay * scale,
+  }));
+  const totalPeriodHours = periodPayroll.reduce((total, item) => total + item.displayHours, 0);
+  const totalPeriodLaborCost = periodPayroll.reduce((total, item) => total + item.displayTotalPay, 0);
+  const workingEmployeeCount = periodPayroll.filter((item) => item.displayHours > 0).length;
   const exportDashboardCsv = () => {
-    const payrollRows = buildPayrollRows(payroll, employees);
-    exportRowsAsCsv("dashboard-summary.csv", [
-      ["항목", "값"],
-      ["이번 주 총 근무시간", formatHours(totalWeeklyHours)],
-      ["이번 달 예상 인건비", formatCurrency(monthlyLaborCost)],
-      ["주휴수당 적용 직원", `${weeklyHolidayEnabledCount}명`],
-      ["주 15시간 근접 직원", `${nearThreshold.length}명`],
-      ["이번 주 총 근무 인원", `${weeklyWorkingEmployeeCount}명`],
-      [],
-      ...payrollRows,
-    ]);
+    exportRowsAsCsv(
+      "dashboard-summary.csv",
+      buildDashboardRows({
+        period,
+        payroll: periodPayroll,
+        employees,
+        totalHours: totalPeriodHours,
+        totalLaborCost: totalPeriodLaborCost,
+        weeklyHolidayEnabledCount,
+        nearThreshold,
+        workingEmployeeCount,
+      }),
+    );
   };
 
   return (
@@ -290,12 +303,46 @@ function Dashboard({
         { label: "PDF 저장", onClick: saveCurrentViewAsPdf, variant: "secondary" },
       ]}
     >
+      <div className="rounded-xl border border-moss/20 bg-gradient-to-r from-mint/25 via-white to-stone-50 p-4 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-moss/80">Dashboard Period</p>
+            <h4 className="mt-1 text-base font-bold text-ink">주간 / 월간 보기</h4>
+            <p className="mt-1 text-sm text-stone-600">
+              {period === "weekly" ? "주간 기준으로 현재 근무 현황을 보여줍니다." : "월간 환산 기준으로 대시보드를 보여줍니다."}
+            </p>
+          </div>
+          <div className="inline-flex rounded-lg border border-line bg-white p-1 shadow-sm">
+          <button
+            type="button"
+            onClick={() => onPeriodChange("weekly")}
+            className={`inline-flex items-center gap-2 rounded-md px-4 py-3 text-sm font-semibold transition ${
+              period === "weekly" ? "bg-white text-moss shadow-sm" : "text-stone-600 hover:text-ink"
+            }`}
+          >
+            <ClipboardList size={16} />
+            주간
+          </button>
+          <button
+            type="button"
+            onClick={() => onPeriodChange("monthly")}
+            className={`inline-flex items-center gap-2 rounded-md px-4 py-3 text-sm font-semibold transition ${
+              period === "monthly" ? "bg-white text-moss shadow-sm" : "text-stone-600 hover:text-ink"
+            }`}
+          >
+            <CalendarDays size={16} />
+            월간
+          </button>
+        </div>
+      </div>
+      </div>
+
       <div className="grid grid-cols-5 gap-4">
-        <MetricCard title="이번 주 총 근무시간" value={formatHours(totalWeeklyHours)} icon={ClipboardList} />
-        <MetricCard title="이번 달 예상 인건비" value={formatCurrency(monthlyLaborCost)} icon={WalletCards} />
+        <MetricCard title={`${periodLabel} 총 근무시간`} value={formatHours(totalPeriodHours)} icon={ClipboardList} />
+        <MetricCard title={`${periodLabel} 예상 인건비`} value={formatCurrency(totalPeriodLaborCost)} icon={WalletCards} />
         <MetricCard title="주휴수당 적용 직원" value={`${weeklyHolidayEnabledCount}명`} icon={Users} />
         <MetricCard title="주 15시간 근접 직원" value={`${nearThreshold.length}명`} icon={AlertTriangle} />
-        <MetricCard title="이번 주 총 근무 인원" value={`${weeklyWorkingEmployeeCount}명`} icon={CalendarDays} />
+        <MetricCard title={`${periodLabel} 총 근무 인원`} value={`${workingEmployeeCount}명`} icon={CalendarDays} />
       </div>
 
       {nearThreshold.length > 0 && (
@@ -316,7 +363,7 @@ function Dashboard({
         </div>
       )}
 
-      <DashboardPayrollTable payroll={payroll} employees={employees} />
+      <DashboardPayrollTable payroll={periodPayroll} employees={employees} period={period} />
     </Panel>
   );
 }
@@ -336,20 +383,24 @@ function MetricCard({ title, value, icon: Icon }: { title: string; value: string
 function DashboardPayrollTable({
   payroll,
   employees,
+  period,
 }: {
-  payroll: ReturnType<typeof calculatePayroll>;
+  payroll: Array<DashboardPayrollRow>;
   employees: Employee[];
+  period: DashboardPeriod;
 }) {
+  const periodLabel = period === "weekly" ? "주간" : "월간";
+  const payUnitLabel = period === "weekly" ? "주" : "월";
   return (
     <div className="overflow-x-auto rounded-md border border-line bg-white">
       <table className="min-w-[980px] w-full text-left text-sm">
         <thead className="bg-stone-50 text-stone-600">
           <tr>
             <th className="px-4 py-3">직원명</th>
-            <th className="px-4 py-3">주 근무시간</th>
-            <th className="px-4 py-3">기본 주급</th>
-            <th className="px-4 py-3">주휴수당</th>
-            <th className="px-4 py-3">예상 월급</th>
+            <th className="px-4 py-3">{periodLabel} 근무시간</th>
+            <th className="px-4 py-3">{payUnitLabel} 기본급</th>
+            <th className="px-4 py-3">{payUnitLabel} 주휴수당</th>
+            <th className="px-4 py-3">{payUnitLabel} 예상 급여</th>
             <th className="px-4 py-3">주휴수당 발생 여부</th>
             <th className="px-4 py-3">경고 상태</th>
           </tr>
@@ -367,10 +418,10 @@ function DashboardPayrollTable({
                 }`}
               >
                 <td className="px-4 py-3 font-semibold">{employee?.name}</td>
-                <td className="px-4 py-3">{formatHours(item.weeklyHours)}</td>
-                <td className="px-4 py-3">{formatCurrency(item.baseWeeklyPay)}</td>
-                <td className="px-4 py-3 font-medium">{formatCurrency(item.weeklyHolidayPay)}</td>
-                <td className="px-4 py-3 font-bold">{formatCurrency(item.estimatedMonthlyPay)}</td>
+                <td className="px-4 py-3">{formatHours(item.displayHours)}</td>
+                <td className="px-4 py-3">{formatCurrency(item.displayBasePay)}</td>
+                <td className="px-4 py-3 font-medium">{formatCurrency(item.displayHolidayPay)}</td>
+                <td className="px-4 py-3 font-bold">{formatCurrency(item.displayTotalPay)}</td>
                 <td className="px-4 py-3">
                   <span
                     className={`rounded px-2 py-1 text-xs font-bold ${
@@ -392,6 +443,57 @@ function DashboardPayrollTable({
       </table>
     </div>
   );
+}
+
+type DashboardPayrollRow = EmployeePayroll & {
+  displayHours: number;
+  displayBasePay: number;
+  displayHolidayPay: number;
+  displayTotalPay: number;
+};
+
+function buildDashboardRows({
+  period,
+  payroll,
+  employees,
+  totalHours,
+  totalLaborCost,
+  weeklyHolidayEnabledCount,
+  nearThreshold,
+  workingEmployeeCount,
+}: {
+  period: DashboardPeriod;
+  payroll: DashboardPayrollRow[];
+  employees: Employee[];
+  totalHours: number;
+  totalLaborCost: number;
+  weeklyHolidayEnabledCount: number;
+  nearThreshold: EmployeePayroll[];
+  workingEmployeeCount: number;
+}) {
+  const summaryPeriodLabel = period === "weekly" ? "이번 주" : "이번 달";
+  const payPeriodLabel = period === "weekly" ? "주간" : "월간";
+  return [
+    ["항목", "값"],
+    [`${summaryPeriodLabel} 총 근무시간`, formatHours(totalHours)],
+    [`${summaryPeriodLabel} 예상 인건비`, formatCurrency(totalLaborCost)],
+    ["주휴수당 적용 직원", `${weeklyHolidayEnabledCount}명`],
+    ["주 15시간 근접 직원", `${nearThreshold.length}명`],
+    [`${summaryPeriodLabel} 총 근무 인원`, `${workingEmployeeCount}명`],
+    [],
+    ["직원명", `${payPeriodLabel} 근무시간`, `${payPeriodLabel} 기본급`, `${payPeriodLabel} 주휴수당`, `${payPeriodLabel} 예상 급여`, "주휴발생여부"],
+    ...payroll.map((item) => {
+      const employee = employees.find((target) => target.id === item.employeeId);
+      return [
+        employee?.name ?? "",
+        item.displayHours.toFixed(2),
+        Math.round(item.displayBasePay),
+        Math.round(item.displayHolidayPay),
+        Math.round(item.displayTotalPay),
+        item.qualifiesForWeeklyHolidayPay ? "발생" : "미발생",
+      ];
+    }),
+  ];
 }
 
 function getDashboardWarning(weeklyHours: number): { label: string; tone: "empty" | "near" | "holiday" | "normal"; className: string } {
