@@ -70,6 +70,9 @@ function App() {
   const [activeView, setActiveView] = useState<ViewId>("dashboard");
   const [dashboardPeriod, setDashboardPeriod] = useState<DashboardPeriod>("weekly");
   const [showSplash, setShowSplash] = useState(true);
+  const [splashCode, setSplashCode] = useState("");
+  const [splashGateReady, setSplashGateReady] = useState(false);
+  const [splashError, setSplashError] = useState(false);
   const {
     employees,
     shifts,
@@ -90,9 +93,16 @@ function App() {
   const weeklyHolidayEnabledCount = activeEmployees.filter((employee) => employee.weeklyHolidayPayEnabled).length;
   const nearThreshold = payroll.filter((item) => item.isNearFifteenHours);
   useEffect(() => {
-    const timer = window.setTimeout(() => setShowSplash(false), 3000);
+    const timer = window.setTimeout(() => setSplashGateReady(true), 3000);
     return () => window.clearTimeout(timer);
   }, []);
+  useEffect(() => {
+    if (splashGateReady && splashCode === "0001") {
+      const timer = window.setTimeout(() => setShowSplash(false), 350);
+      return () => window.clearTimeout(timer);
+    }
+    return undefined;
+  }, [splashCode, splashGateReady]);
   const updateEmployee = (id: string, patch: Partial<Employee>) => {
     setEmployees(employees.map((employee) => (employee.id === id ? normalizeEmployee({ ...employee, ...patch }) : employee)));
   };
@@ -133,7 +143,25 @@ function App() {
 
   return (
     <div className="min-h-screen min-w-[1200px] bg-paper text-ink">
-      {showSplash && <SplashScreen />}
+      {showSplash && (
+        <SplashScreen
+          code={splashCode}
+          gateReady={splashGateReady}
+          error={splashError}
+          onCodeChange={(value) => {
+            setSplashCode(value);
+            setSplashError(false);
+          }}
+          onSubmit={() => {
+            if (!splashGateReady) return;
+            if (splashCode === "0001") {
+              setSplashError(false);
+              return;
+            }
+            setSplashError(true);
+          }}
+        />
+      )}
       <div className="flex min-h-screen flex-col">
         <header className="sticky top-0 z-10 border-b border-line bg-white/95 backdrop-blur">
           <div className="px-6 py-4">
@@ -222,14 +250,67 @@ function App() {
   );
 }
 
-function SplashScreen() {
+function SplashScreen({
+  code,
+  gateReady,
+  error,
+  onCodeChange,
+  onSubmit,
+}: {
+  code: string;
+  gateReady: boolean;
+  error: boolean;
+  onCodeChange: (value: string) => void;
+  onSubmit: () => void;
+}) {
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-white">
-      <div className="flex flex-col items-center gap-5 px-6 text-center">
+      <div className="flex w-full max-w-md flex-col items-center gap-5 px-6 text-center">
         <div className="splash-logo grid h-32 w-32 place-items-center rounded-[2rem] bg-moss text-white shadow-[0_24px_55px_rgba(79,141,97,0.24)]">
           <Coffee size={68} strokeWidth={1.75} />
         </div>
         <h1 className="splash-title text-4xl font-black tracking-tight text-ink sm:text-5xl">Cafe Manager</h1>
+        <form
+          className="w-full pt-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onSubmit();
+          }}
+        >
+          <label className="block text-left text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
+            Access Code
+          </label>
+          <div className="mt-2 flex gap-2">
+            <input
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={4}
+              autoComplete="one-time-code"
+              value={code}
+              onChange={(event) => onCodeChange(event.target.value.replace(/\D/g, "").slice(0, 4))}
+              placeholder="0001"
+              className={`w-full rounded-xl border px-4 py-3 text-center text-lg font-semibold tracking-[0.4em] ${
+                error ? "border-red-300" : "border-line"
+              }`}
+              aria-label="스플래쉬 비밀번호"
+            />
+            <button
+              type="submit"
+              className="rounded-xl bg-moss px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#2f533f]"
+            >
+              확인
+            </button>
+          </div>
+          <div className="mt-2 min-h-5 text-sm">
+            {error ? (
+              <p className="font-medium text-red-600">비밀번호가 올바르지 않습니다.</p>
+            ) : gateReady ? (
+              <p className="text-stone-500">0001을 입력하면 본 화면이 열립니다.</p>
+            ) : (
+              <p className="text-stone-400">잠시 후 입력 가능합니다.</p>
+            )}
+          </div>
+        </form>
       </div>
     </div>
   );
@@ -914,26 +995,26 @@ function ScheduleView({
                       >
                         {isCompact ? (
                           <div className={`flex h-full min-h-0 flex-col overflow-hidden ${isUltraCompact ? "gap-0" : "gap-0.5"}`}>
-                            <div className={`flex items-start ${isUltraCompact ? "gap-1" : "gap-1.5"}`}>
+                            <div className={`flex items-start ${isUltraCompact ? "gap-0.5" : "gap-1.5"}`}>
                               <span
-                                className={`mt-0.5 shrink-0 rounded-full ${isUltraCompact ? "h-2 w-2" : "h-2.5 w-2.5"}`}
+                                className={`mt-0.5 shrink-0 rounded-full ${isUltraCompact ? "h-1.5 w-1.5" : "h-2.5 w-2.5"}`}
                                 style={{ backgroundColor: color.accent }}
                               />
                               <div className="min-w-0 flex-1">
                                 <strong
                                   className={`block truncate font-bold leading-tight text-ink ${
-                                    isUltraCompact ? "text-[9px]" : "text-[11px]"
+                                    isUltraCompact ? "text-[7px]" : "text-[11px]"
                                   }`}
                                 >
                                   {employee?.name ?? "직원 없음"}
                                 </strong>
-                                <p className={`truncate leading-tight text-stone-600 ${isUltraCompact ? "text-[8px]" : "text-[10px]"}`}>
+                                <p className={`truncate leading-tight text-stone-600 ${isUltraCompact ? "text-[6px]" : "text-[10px]"}`}>
                                   {shift.startTime}-{shift.endTime}
                                 </p>
                               </div>
-                              {overlapped && <AlertTriangle size={isUltraCompact ? 10 : 12} className="mt-0.5 shrink-0 text-amber" />}
+                              {overlapped && <AlertTriangle size={isUltraCompact ? 9 : 12} className="mt-0.5 shrink-0 text-amber" />}
                             </div>
-                            <div className={`space-y-0.5 leading-tight text-stone-700 ${isUltraCompact ? "text-[8px]" : "text-[10px]"}`}>
+                            <div className={`space-y-0.5 leading-tight text-stone-700 ${isUltraCompact ? "text-[6px]" : "text-[10px]"}`}>
                               <p className="truncate">
                                 실근무 <span className="font-semibold text-ink">{compactHours}</span>
                               </p>
@@ -943,11 +1024,7 @@ function ScheduleView({
                                   {compactNote || "-"}
                                 </span>
                               </p>
-                              {!isUltraCompact && (
-                                <p className="truncate">
-                                  휴게 {shift.breakMinutes}분
-                                </p>
-                              )}
+                              {!isUltraCompact && <p className="truncate">휴게 {shift.breakMinutes}분</p>}
                             </div>
                           </div>
                         ) : (
