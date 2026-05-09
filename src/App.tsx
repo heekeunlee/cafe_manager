@@ -127,40 +127,14 @@ function App() {
 
   return (
     <div className="min-h-screen min-w-[1200px] bg-paper text-ink">
-      <div className="flex min-h-screen">
-        <aside className="w-64 shrink-0 border-r border-line bg-white px-4 py-5">
-          <div className="mb-8 flex items-center gap-3 px-2">
-            <div className="grid h-10 w-10 place-items-center rounded-md bg-moss text-white">
-              <Coffee size={22} />
-            </div>
-            <div>
-              <p className="text-sm text-stone-500">Cafe Ops</p>
-              <h1 className="font-semibold">근무 급여 관리</h1>
-            </div>
-          </div>
-          <nav className="space-y-1">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => setActiveView(item.id)}
-                  className={`flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm font-medium transition ${
-                    activeView === item.id ? "bg-mint text-moss" : "text-stone-600 hover:bg-stone-100"
-                  }`}
-                >
-                  <Icon size={18} />
-                  {item.label}
-                </button>
-              );
-            })}
-          </nav>
-        </aside>
-
-        <main className="flex min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-10 border-b border-line bg-white/95 px-6 py-4 backdrop-blur">
+      <div className="flex min-h-screen flex-col">
+        <header className="sticky top-0 z-10 border-b border-line bg-white/95 backdrop-blur">
+          <div className="px-6 py-4">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
+                <div className="grid h-10 w-10 place-items-center rounded-md bg-moss text-white">
+                  <Coffee size={22} />
+                </div>
                 <div>
                   <p className="text-sm text-stone-500">{settings.baseWeekLabel}</p>
                   <h2 className="text-2xl font-bold">{settings.storeName}</h2>
@@ -170,8 +144,31 @@ function App() {
                 <StatusPill saved={saved} />
               </div>
             </div>
-          </header>
+          </div>
+          <nav className="border-t border-line px-6">
+            <div className="flex gap-1">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveView(item.id)}
+                    className={`inline-flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-semibold transition ${
+                      activeView === item.id
+                        ? "border-moss text-moss"
+                        : "border-transparent text-stone-600 hover:border-stone-200 hover:text-ink"
+                    }`}
+                  >
+                    <Icon size={17} />
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+          </nav>
+        </header>
 
+        <main className="flex min-w-0 flex-1 flex-col">
           <section className="space-y-6 p-6">
             {activeView === "dashboard" && (
               <Dashboard
