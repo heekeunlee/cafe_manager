@@ -15,6 +15,23 @@ npm run dev
 npm run build
 ```
 
+## Supabase 동기화 설정
+
+맥북과 휴대폰이 같은 데이터를 실시간으로 보려면 Supabase에서 테이블을 먼저 만들어야 합니다.
+
+1. Supabase Dashboard에서 프로젝트를 엽니다.
+2. 왼쪽 메뉴의 SQL Editor로 이동합니다.
+3. [supabase/schema.sql](supabase/schema.sql) 내용을 붙여넣고 실행합니다.
+4. 앱을 다시 열면 직원, 근무표, 설정 데이터가 Supabase에 저장되고 다른 기기에도 실시간 반영됩니다.
+
+현재 앱에는 아래 Publishable key가 연결되어 있습니다.
+
+```text
+VITE_SUPABASE_URL=https://njkiqxqthgmknvtplrbn.supabase.co
+```
+
+테이블이 아직 없거나 Supabase 연결이 실패하면 기존 localStorage 저장 방식으로 동작합니다.
+
 ## 파일 구조
 
 ```text

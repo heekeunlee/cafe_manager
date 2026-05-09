@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { sampleEmployees, sampleSettings, sampleShifts } from "./data/sampleData";
-import { useLocalStorage } from "./hooks/useLocalStorage";
+import { useSupabaseCafeData } from "./hooks/useSupabaseCafeData";
 import type { Employee, Shift, StoreSettings, Weekday } from "./types";
 import {
   calculatePayroll,
@@ -66,15 +66,15 @@ const normalizeEmployee = (employee: Employee): Employee => ({
 
 function App() {
   const [activeView, setActiveView] = useState<ViewId>("dashboard");
-  const [employees, setEmployees, employeesSaved] = useLocalStorage<Employee[]>(
-    "cafe-manager-employees",
-    sampleEmployees,
-  );
-  const [shifts, setShifts, shiftsSaved] = useLocalStorage<Shift[]>("cafe-manager-shifts", sampleShifts);
-  const [storedSettings, setStoredSettings, settingsSaved] = useLocalStorage<StoreSettings>(
-    "cafe-manager-settings",
-    sampleSettings,
-  );
+  const {
+    employees,
+    shifts,
+    settings: storedSettings,
+    setEmployees,
+    setShifts,
+    setSettings: setStoredSettings,
+    saved,
+  } = useSupabaseCafeData();
   const settings = normalizeSettings(storedSettings);
   const normalizedEmployees = useMemo(() => employees.map(normalizeEmployee), [employees]);
 
@@ -88,8 +88,6 @@ function App() {
   const weeklyHolidayEnabledCount = activeEmployees.filter((employee) => employee.weeklyHolidayPayEnabled).length;
   const nearThreshold = payroll.filter((item) => item.isNearFifteenHours);
   const weeklyWorkingEmployeeCount = payroll.filter((item) => item.weeklyHours > 0).length;
-  const saved = employeesSaved && shiftsSaved && settingsSaved;
-
   const updateEmployee = (id: string, patch: Partial<Employee>) => {
     setEmployees(employees.map((employee) => (employee.id === id ? normalizeEmployee({ ...employee, ...patch }) : employee)));
   };
