@@ -695,13 +695,17 @@ function ScheduleView({
                     const overlapped = hasOverlap(shift);
                     const color = getEmployeeScheduleColor(employee, shift.employeeId);
                     const isSplit = laneCount > 1;
+                    const isCompact = isSplit || overlapped;
                     const position = getShiftPositionStyle(shift, lane, laneCount);
 
                     return (
                       <button
                         key={shift.id}
                         onClick={() => openEditModal(shift)}
-                        className="absolute overflow-hidden rounded-md border p-2 text-left shadow-sm transition hover:z-10 hover:-translate-y-0.5 hover:shadow"
+                        title={`${employee?.name ?? "직원 없음"} ${shift.startTime}-${shift.endTime}, 휴게 ${shift.breakMinutes}분, 실근무 ${formatHours(calculateShiftHours(shift))}`}
+                        className={`absolute overflow-hidden rounded-md border text-left shadow-sm transition hover:z-10 hover:-translate-y-0.5 hover:shadow ${
+                          isCompact ? "p-1.5" : "p-2"
+                        }`}
                         style={{
                           ...position,
                           backgroundColor: overlapped ? "#fff4dd" : color.background,
@@ -711,27 +715,45 @@ function ScheduleView({
                           boxShadow: isSplit ? "0 8px 18px rgba(23, 32, 27, 0.1)" : undefined,
                         }}
                       >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex min-w-0 items-center gap-2">
-                            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color.accent }} />
-                            <strong className="truncate text-sm">{employee?.name ?? "직원 없음"}</strong>
+                        {isCompact ? (
+                          <div className="space-y-0.5">
+                            <div className="flex min-w-0 items-center gap-1.5">
+                              <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color.accent }} />
+                              <strong className="truncate text-xs leading-tight">{employee?.name ?? "직원 없음"}</strong>
+                            </div>
+                            <p className="truncate text-[11px] leading-tight text-stone-600">
+                              {formatShortTime(shift.startTime)}-{formatShortTime(shift.endTime)}
+                            </p>
+                            <p className="truncate text-[11px] font-semibold leading-tight text-ink">
+                              {formatCompactHours(calculateShiftHours(shift))}
+                            </p>
+                            {overlapped && <AlertTriangle size={13} className="text-amber" />}
                           </div>
-                          <div className="flex shrink-0 items-center gap-1">
-                            {overlapped && <AlertTriangle size={16} className="text-amber" />}
-                          </div>
-                        </div>
-                        <div className="mt-1 space-y-0.5 text-xs text-stone-600">
-                          <p className="flex items-center gap-1 whitespace-nowrap">
-                            <Clock size={13} />
-                            {shift.startTime} - {shift.endTime}
-                          </p>
-                          <p className="whitespace-nowrap">휴게 {shift.breakMinutes}분</p>
-                          <p className="whitespace-nowrap font-semibold text-ink">실근무 {formatHours(calculateShiftHours(shift))}</p>
-                        </div>
-                        {shift.note && (
-                          <p className="mt-2 rounded bg-white/70 px-2 py-1 text-xs text-stone-700">{shift.note}</p>
+                        ) : (
+                          <>
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex min-w-0 items-center gap-2">
+                                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color.accent }} />
+                                <strong className="truncate text-sm">{employee?.name ?? "직원 없음"}</strong>
+                              </div>
+                              <div className="flex shrink-0 items-center gap-1">
+                                {overlapped && <AlertTriangle size={16} className="text-amber" />}
+                              </div>
+                            </div>
+                            <div className="mt-1 space-y-0.5 text-xs text-stone-600">
+                              <p className="flex items-center gap-1 whitespace-nowrap">
+                                <Clock size={13} />
+                                {shift.startTime} - {shift.endTime}
+                              </p>
+                              <p className="whitespace-nowrap">휴게 {shift.breakMinutes}분</p>
+                              <p className="whitespace-nowrap font-semibold text-ink">실근무 {formatHours(calculateShiftHours(shift))}</p>
+                            </div>
+                            {shift.note && (
+                              <p className="mt-2 rounded bg-white/70 px-2 py-1 text-xs text-stone-700">{shift.note}</p>
+                            )}
+                            {overlapped && <p className="mt-2 text-xs font-medium text-amber">시간 겹침</p>}
+                          </>
                         )}
-                        {overlapped && <p className="mt-2 text-xs font-medium text-amber">시간 겹침</p>}
                       </button>
                     );
                   })}
@@ -917,6 +939,14 @@ function normalizedShiftRange(shift: Shift): [number, number] {
   let end = parseTimeToMinutes(shift.endTime);
   if (end <= start) end += 24 * 60;
   return [start, end];
+}
+
+function formatShortTime(time: string): string {
+  return time.replace(":00", "");
+}
+
+function formatCompactHours(hours: number): string {
+  return `${Number.isInteger(hours) ? hours.toFixed(0) : hours.toFixed(1)}h`;
 }
 
 const employeePastelColors = [
