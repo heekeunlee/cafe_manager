@@ -890,6 +890,7 @@ function ScheduleView({
                     const color = getEmployeeScheduleColor(employee, shift.employeeId);
                     const isSplit = laneCount > 1;
                     const isCompact = isSplit || overlapped;
+                    const isUltraCompact = laneCount >= 3;
                     const position = getShiftPositionStyle(shift, lane, laneCount);
                     const compactHours = formatCompactHours(calculateShiftHours(shift));
                     const compactNote = shift.note?.trim();
@@ -912,25 +913,29 @@ function ScheduleView({
                         }}
                       >
                         {isCompact ? (
-                          <div className="flex h-full min-h-0 flex-col gap-0.5 overflow-hidden">
-                            <div className="flex items-start gap-1.5">
-                              <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color.accent }} />
+                          <div className={`flex h-full min-h-0 flex-col overflow-hidden ${isUltraCompact ? "gap-0" : "gap-0.5"}`}>
+                            <div className={`flex items-start ${isUltraCompact ? "gap-1" : "gap-1.5"}`}>
+                              <span
+                                className={`mt-0.5 shrink-0 rounded-full ${isUltraCompact ? "h-2 w-2" : "h-2.5 w-2.5"}`}
+                                style={{ backgroundColor: color.accent }}
+                              />
                               <div className="min-w-0 flex-1">
-                                <strong className="block truncate text-[11px] font-bold leading-tight text-ink">
+                                <strong
+                                  className={`block truncate font-bold leading-tight text-ink ${
+                                    isUltraCompact ? "text-[9px]" : "text-[11px]"
+                                  }`}
+                                >
                                   {employee?.name ?? "직원 없음"}
                                 </strong>
-                                <p className="truncate text-[10px] leading-tight text-stone-600">
+                                <p className={`truncate leading-tight text-stone-600 ${isUltraCompact ? "text-[8px]" : "text-[10px]"}`}>
                                   {shift.startTime}-{shift.endTime}
                                 </p>
                               </div>
-                              {overlapped && <AlertTriangle size={12} className="mt-0.5 shrink-0 text-amber" />}
+                              {overlapped && <AlertTriangle size={isUltraCompact ? 10 : 12} className="mt-0.5 shrink-0 text-amber" />}
                             </div>
-                            <div className="space-y-0.5 text-[10px] leading-tight text-stone-700">
+                            <div className={`space-y-0.5 leading-tight text-stone-700 ${isUltraCompact ? "text-[8px]" : "text-[10px]"}`}>
                               <p className="truncate">
                                 실근무 <span className="font-semibold text-ink">{compactHours}</span>
-                              </p>
-                              <p className="truncate">
-                                휴게 {shift.breakMinutes}분
                               </p>
                               <p className="truncate">
                                 메모{" "}
@@ -938,6 +943,11 @@ function ScheduleView({
                                   {compactNote || "-"}
                                 </span>
                               </p>
+                              {!isUltraCompact && (
+                                <p className="truncate">
+                                  휴게 {shift.breakMinutes}분
+                                </p>
+                              )}
                             </div>
                           </div>
                         ) : (
