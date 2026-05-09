@@ -29,6 +29,8 @@ import {
 
 type ViewId = "dashboard" | "employees" | "schedule" | "payroll" | "settings";
 
+const APP_VERSION = "v1.3";
+
 const navItems: Array<{ id: ViewId; label: string; icon: typeof LayoutDashboard }> = [
   { id: "dashboard", label: "대시보드", icon: LayoutDashboard },
   { id: "employees", label: "직원관리", icon: Users },
@@ -136,7 +138,13 @@ function App() {
                   <Coffee size={22} />
                 </div>
                 <div>
-                  <p className="text-sm text-stone-500">{settings.baseWeekLabel}</p>
+                  <div className="flex items-center gap-2">
+                    <h1 className="font-semibold">근무 급여 관리</h1>
+                    <span className="rounded border border-line bg-paper px-1.5 py-0.5 text-[11px] font-semibold text-stone-500">
+                      {APP_VERSION}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-sm text-stone-500">{settings.baseWeekLabel}</p>
                   <h2 className="text-2xl font-bold">{settings.storeName}</h2>
                 </div>
               </div>
