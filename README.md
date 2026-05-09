@@ -24,6 +24,8 @@ npm run build
 3. [supabase/schema.sql](supabase/schema.sql) 내용을 붙여넣고 실행합니다.
 4. 앱을 다시 열면 직원, 근무표, 설정 데이터가 Supabase에 저장되고 다른 기기에도 실시간 반영됩니다.
 
+이미 다른 타입으로 테이블을 만들었고 테이블이 비어 있다면 [supabase/reset_schema.sql](supabase/reset_schema.sql)을 실행해 문자열 ID 구조로 다시 만들 수 있습니다.
+
 현재 앱에는 아래 Publishable key가 연결되어 있습니다.
 
 ```text
