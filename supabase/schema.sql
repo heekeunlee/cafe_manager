@@ -11,6 +11,15 @@ create table if not exists public.employees (
   created_at timestamptz not null default now()
 );
 
+alter table public.employees add column if not exists role_note text not null default '';
+alter table public.employees add column if not exists color text;
+alter table public.employees add column if not exists hourly_wage integer not null default 0;
+alter table public.employees add column if not exists start_date date not null default current_date;
+alter table public.employees add column if not exists end_date date;
+alter table public.employees add column if not exists weekly_holiday_pay_enabled boolean not null default true;
+alter table public.employees add column if not exists status text not null default 'active';
+alter table public.employees add column if not exists created_at timestamptz not null default now();
+
 create table if not exists public.shifts (
   id text primary key,
   employee_id text not null references public.employees(id) on delete cascade,
@@ -23,6 +32,15 @@ create table if not exists public.shifts (
   created_at timestamptz not null default now()
 );
 
+alter table public.shifts add column if not exists employee_id text;
+alter table public.shifts add column if not exists weekday text;
+alter table public.shifts add column if not exists start_time text;
+alter table public.shifts add column if not exists end_time text;
+alter table public.shifts add column if not exists break_minutes integer not null default 0;
+alter table public.shifts add column if not exists repeats_weekly boolean not null default true;
+alter table public.shifts add column if not exists note text;
+alter table public.shifts add column if not exists created_at timestamptz not null default now();
+
 create table if not exists public.settings (
   id text primary key,
   store_name text not null,
@@ -32,6 +50,13 @@ create table if not exists public.settings (
   weekly_holiday_calculation text not null,
   created_at timestamptz not null default now()
 );
+
+alter table public.settings add column if not exists store_name text;
+alter table public.settings add column if not exists base_week_label text;
+alter table public.settings add column if not exists default_hourly_wage integer not null default 10030;
+alter table public.settings add column if not exists monthly_week_multiplier numeric not null default 4.345;
+alter table public.settings add column if not exists weekly_holiday_calculation text;
+alter table public.settings add column if not exists created_at timestamptz not null default now();
 
 alter table public.employees enable row level security;
 alter table public.shifts enable row level security;
