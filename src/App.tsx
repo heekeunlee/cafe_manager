@@ -14,7 +14,7 @@ import {
   Users,
   WalletCards,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { sampleEmployees, sampleSettings, sampleShifts } from "./data/sampleData";
 import { useSupabaseCafeData } from "./hooks/useSupabaseCafeData";
 import type { Employee, EmployeePayroll, Shift, StoreSettings, Weekday } from "./types";
@@ -69,6 +69,7 @@ const normalizeEmployee = (employee: Employee): Employee => ({
 function App() {
   const [activeView, setActiveView] = useState<ViewId>("dashboard");
   const [dashboardPeriod, setDashboardPeriod] = useState<DashboardPeriod>("weekly");
+  const [showSplash, setShowSplash] = useState(true);
   const {
     employees,
     shifts,
@@ -88,6 +89,10 @@ function App() {
   );
   const weeklyHolidayEnabledCount = activeEmployees.filter((employee) => employee.weeklyHolidayPayEnabled).length;
   const nearThreshold = payroll.filter((item) => item.isNearFifteenHours);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setShowSplash(false), 3000);
+    return () => window.clearTimeout(timer);
+  }, []);
   const updateEmployee = (id: string, patch: Partial<Employee>) => {
     setEmployees(employees.map((employee) => (employee.id === id ? normalizeEmployee({ ...employee, ...patch }) : employee)));
   };
@@ -128,6 +133,7 @@ function App() {
 
   return (
     <div className="min-h-screen min-w-[1200px] bg-paper text-ink">
+      {showSplash && <SplashScreen />}
       <div className="flex min-h-screen flex-col">
         <header className="sticky top-0 z-10 border-b border-line bg-white/95 backdrop-blur">
           <div className="px-6 py-4">
@@ -138,7 +144,7 @@ function App() {
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h1 className="font-semibold">근무 급여 관리</h1>
+                    <h1 className="font-semibold">Cafe Manger</h1>
                     <span className="rounded border border-line bg-paper px-1.5 py-0.5 text-[11px] font-semibold text-stone-500">
                       {APP_VERSION}
                     </span>
@@ -211,6 +217,22 @@ function App() {
             )}
           </section>
         </main>
+      </div>
+    </div>
+  );
+}
+
+function SplashScreen() {
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-[radial-gradient(circle_at_top,_rgba(79,141,97,0.14),_rgba(250,247,240,0.98)_55%,_rgba(245,242,235,1)_100%)]">
+      <div className="flex flex-col items-center gap-4 px-6 text-center">
+        <div className="grid h-28 w-28 place-items-center rounded-3xl bg-moss text-white shadow-[0_18px_50px_rgba(79,141,97,0.28)]">
+          <Coffee size={64} strokeWidth={1.8} />
+        </div>
+        <div>
+          <h1 className="text-4xl font-black tracking-tight text-ink">Cafe Manger</h1>
+          <p className="mt-2 text-sm font-medium tracking-[0.2em] text-stone-500">근무 · 급여 · 정산 관리</p>
+        </div>
       </div>
     </div>
   );
