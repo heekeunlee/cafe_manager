@@ -716,18 +716,25 @@ function ScheduleView({
                         }}
                       >
                         {isCompact ? (
-                          <div className="space-y-0.5">
-                            <div className="flex min-w-0 items-center gap-1.5">
+                          <div className="flex h-full gap-1.5">
+                            <div className="flex shrink-0 flex-col items-center gap-1">
                               <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color.accent }} />
-                              <strong className="truncate text-xs leading-tight">{employee?.name ?? "직원 없음"}</strong>
+                              <strong
+                                className="text-[11px] font-bold leading-none text-ink"
+                                style={{ writingMode: "vertical-rl", textOrientation: "upright" }}
+                              >
+                                {employee?.name ?? "직원 없음"}
+                              </strong>
                             </div>
-                            <p className="truncate text-[11px] leading-tight text-stone-600">
-                              {formatShortTime(shift.startTime)}-{formatShortTime(shift.endTime)}
-                            </p>
-                            <p className="truncate text-[11px] font-semibold leading-tight text-ink">
-                              {formatCompactHours(calculateShiftHours(shift))}
-                            </p>
-                            {overlapped && <AlertTriangle size={13} className="text-amber" />}
+                            <div className="min-w-0 space-y-0.5">
+                              <p className="truncate text-[11px] leading-tight text-stone-600">
+                                {formatShortTime(shift.startTime)}-{formatShortTime(shift.endTime)}
+                              </p>
+                              <p className="truncate text-[11px] font-semibold leading-tight text-ink">
+                                {formatCompactHours(calculateShiftHours(shift))}
+                              </p>
+                              {overlapped && <AlertTriangle size={13} className="text-amber" />}
+                            </div>
                           </div>
                         ) : (
                           <>
