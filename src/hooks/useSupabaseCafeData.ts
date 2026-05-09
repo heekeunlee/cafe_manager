@@ -88,7 +88,10 @@ export function useSupabaseCafeData() {
     const remoteSettings = settingsResult.data ? rowToSettings(settingsResult.data) : sampleSettings;
 
     if (remoteEmployees.length === 0 && remoteShifts.length === 0 && !settingsResult.data) {
-      await Promise.all([syncEmployees(employees), syncShifts(shifts), syncSettings(settings)]);
+      await syncEmployees(employees);
+      await syncSettings(settings);
+      await syncShifts(shifts);
+      setSaveState("saved");
       return;
     }
 
